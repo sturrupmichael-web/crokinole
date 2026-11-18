@@ -62,6 +62,7 @@ let rs: RoomState = resume?.rs ?? {
   players: [],
   seatPlayer: [null, null, null, null],
   target: 100,
+  format: 'tournament',
   board: 'classic',
   game: null,
   moving: false,
@@ -375,8 +376,13 @@ function renderLobby(): void {
         <h2>Players <span class="muted">${n}/4</span></h2>
         <ul class="players">${rows}${empty}</ul>
         ${teams}
-        <div class="row"><label class="muted">Game to</label>
-          <div class="seg"><button data-target="50" class="${rs.target === 50 ? 'on' : ''}">50</button><button data-target="100" class="${rs.target === 100 ? 'on' : ''}">100</button></div>
+        <div class="row"><label class="muted">Game</label>
+          <div class="seg">${(['rounds', '50', '100'] as const)
+            .map((v) => {
+              const on = v === 'rounds' ? rs.format !== 'casual' : rs.format === 'casual' && rs.target === Number(v);
+              return `<button data-target="${v}" class="${on ? 'on' : ''}">${v === 'rounds' ? '4 rounds' : `To ${v}`}</button>`;
+            })
+            .join('')}</div>
         </div>
         <div class="row"><label class="muted">Board</label>
           <div class="seg"><button data-board="classic" class="${rs.board !== 'five-hole' ? 'on' : ''}">Classic</button><button data-board="five-hole" class="${rs.board === 'five-hole' ? 'on' : ''}">5-hole (−10s)</button></div>
@@ -398,7 +404,11 @@ function renderLobby(): void {
   );
   lobby.querySelectorAll<HTMLButtonElement>('[data-target]').forEach((b) =>
     b.addEventListener('click', () => {
-      rs.target = Number(b.dataset.target) as 50 | 100;
+      if (b.dataset.target === 'rounds') rs.format = 'tournament';
+      else {
+        rs.format = 'casual';
+        rs.target = Number(b.dataset.target) as 50 | 100;
+      }
       broadcast();
     }),
   );
@@ -413,7 +423,7 @@ function startGame(): void {
   rs.seatPlayer = [null, null, null, null];
   // Lobby order is turn order.
   SEAT_ORDER[n].forEach((seat, i) => (rs.seatPlayer[seat] = i));
-  const game = createGame({ players: n, target: rs.target, board: rs.board ?? 'classic' });
+  const game = createGame({ players: n, target: rs.target, format: rs.format ?? 'tournament', board: rs.board ?? 'classic' });
   view.setFiveHole(game.settings.board === 'five-hole');
   rs.phase = 'playing';
   rs.game = game;

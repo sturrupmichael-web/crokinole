@@ -2,7 +2,7 @@
  * DOM overlays shared by local mode and the host screen: scoreboard, turn
  * banner, big callouts, the round-tally panel and a generic modal.
  */
-import type { GameState, Requirement } from '../engine/rules';
+import { type GameState, type Requirement, TOURNAMENT_ROUNDS, isTournament } from '../engine/rules';
 import { type BoardView, TEAM_COLORS, TEAM_NAMES, loadCameraPref } from '../render/view';
 import type { TallyProgress } from '../game/table';
 import { type Highlight, gameAwards } from '../engine/highlights';
@@ -81,6 +81,12 @@ export function cameraButton(view: BoardView, cls = 'iconbtn cam-btn'): HTMLButt
   return b;
 }
 
+/** "Round 2 of 4" (tournament), "Extra round" after that, or "Round 3 · to 100" (casual). */
+export function roundLabel(state: GameState): string {
+  if (!isTournament(state)) return `Round ${state.round} · to ${state.settings.target}`;
+  return state.round > TOURNAMENT_ROUNDS ? `Extra round ${state.round - TOURNAMENT_ROUNDS}` : `Round ${state.round} of ${TOURNAMENT_ROUNDS}`;
+}
+
 export class Hud {
   readonly root: HTMLElement;
   private score = el('div', 'scoreboard');
@@ -106,7 +112,7 @@ export class Hud {
         )}</span><b>${s}</b></div>`;
       })
       .join('');
-    this.score.innerHTML = `${rows}<div class="meta">Round ${state.round} · to ${state.settings.target}${state.settings.board === 'five-hole' ? ' · 5-hole' : ''}</div>`;
+    this.score.innerHTML = `${rows}<div class="meta">${roundLabel(state)}${state.settings.board === 'five-hole' ? ' · 5-hole' : ''}</div>`;
   }
 
   setBanner(html: string, team: number | null = null): void {
@@ -141,8 +147,12 @@ export class Hud {
     let footer = '';
     if (p.done) {
       const gained = p.result.tallies.filter((t) => t.awarded > 0);
-      const what =
-        gained.length === 0
+      const name = (team: number) => esc(teamLabel(state, names, team));
+      const what = isTournament(state)
+        ? gained.length === 1
+          ? `${name(gained[0].team)} ${verb(teamLabel(state, names, gained[0].team), 'wins', 'win')} the round: <b>+${gained[0].awarded}</b>`
+          : `Tied round: <b>+${gained[0]?.awarded ?? 1}</b> each for ${gained.map((t) => name(t.team)).join(' and ')}`
+        : gained.length === 0
           ? 'A tie. No points this round.'
           : state.teamCount === 2
             ? `${esc(teamLabel(state, names, gained[0].team))} ${verb(teamLabel(state, names, gained[0].team), 'scores', 'score')} <b>${gained[0].awarded}</b>`

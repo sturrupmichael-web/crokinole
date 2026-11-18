@@ -119,7 +119,7 @@ Checked against the NCA Official Rules of Crokinole and the World Crokinole Cham
 `tests/standard-rules.test.ts` plays each rule through the real physics (rule numbers in the
 test names). Where the game differs on purpose, it says so below.
 
-- **Seats and discs.** 2 players sit opposite with 12 discs each. 3 players play
+- **Seats and discs.** 2 players sit opposite with 8 discs each (12 in casual games). 3 players play
   free-for-all with 8 each. 4 players play as partners sitting opposite, with 6 each.
 - **Turns.** Play goes clockwise seen from above (bottom seat, then the left, top and right).
   The round ends when every disc has been shot. The first shot alternates each round in singles
@@ -137,11 +137,13 @@ test names). Where the game differs on purpose, it says so below.
 - **Scoring.** A disc scores the zone it sits in, and the lower zone if it touches a line. Banked
   20s are added. With two sides, only the difference counts. In 3-player games, everyone keeps
   their own total.
-- **Winning.** The first side to the target (50 or 100) at the end of a round wins. A tie at the
-  top plays another round.
-- **Differences from tournament play (deliberate):** singles uses the traditional 12 discs each
-  (NCA singles uses 8); games run to 100 with cancellation scoring instead of NCA's 4-round
-  games scored 2/1/0 per round; 3-player free-for-all and the 5-hole board are house variants.
+- **Game format.** The default is **tournament** (NCA): singles players get 8 discs, a game is
+  4 rounds, the round winner gets 2 game points and a tied round gives 1 each (3 players: the
+  top total gets 2, a tie at the top 1 each). Level after 4 rounds plays extra rounds until
+  someone leads. The **To 50 / To 100** options are casual play: 12 discs each in singles, only
+  the difference between the sides' round totals counts (3 players keep their own totals), and
+  the first side at the target after a round wins, with a tie at the top playing on.
+- **House variants:** 3-player free-for-all (8 discs each) and the 5-hole board.
 
 ## Engine
 

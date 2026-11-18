@@ -185,3 +185,76 @@ describe('NCA 6 / 8e: scoring and the outer line', () => {
     expect(tallyRound(g).tallies[0].total).toBe(15 + 40);
   });
 });
+
+describe('NCA 2 / 4a: tournament format', () => {
+  const tour = (players: 2 | 3 | 4 = 2) => createGame({ players, target: 100, format: 'tournament' });
+  /** End the current round with the given board (two-team games: seat 0 vs seat 2). */
+  const finish = (g: GameState, discs: Array<{ seat: Seat; x: number; y: number }>): GameState => {
+    const s = place(g, discs);
+    // Last disc of the round: a weak shot that comes off, then the round is scored.
+    const last = { ...s, discsLeft: [0, 0, 0, 0] as GameState['discsLeft'] };
+    last.discsLeft[currentSeat(s)] = 1;
+    return resolveShot(last, { seat: currentSeat(s), baselinePos: 0.5, angle: 0, power: 0.01 }).state;
+  };
+
+  it('singles players get 8 discs (4a); doubles 6 each (5a)', () => {
+    expect(tour(2).discsLeft).toEqual([8, 0, 8, 0]);
+    expect(tour(4).discsLeft).toEqual([6, 6, 6, 6]);
+    expect(createGame({ players: 2, target: 100, format: 'casual' }).discsLeft).toEqual([12, 0, 12, 0]);
+  });
+
+  it('a round win scores 2 game points whatever the margin (2a.iv)', () => {
+    const g = finish(tour(), [
+      { seat: 0, x: 0, y: 2 },
+      { seat: 0, x: 0.5, y: -2 },
+      { seat: 2, x: -10, y: 0 },
+    ]);
+    expect(g.lastRound!.tallies.map((t) => t.total)).toEqual([30, 5]);
+    expect(g.scores).toEqual([2, 0]);
+    expect(g.phase).toBe('round-over');
+  });
+
+  it('a tied round scores 1 each, including an empty board', () => {
+    const g = finish(tour(), []);
+    expect(g.scores).toEqual([1, 1]);
+  });
+
+  it('a game is 4 rounds; the most game points wins (2b)', () => {
+    let g = tour();
+    const win0 = [{ seat: 0 as Seat, x: 0, y: 2 }];
+    const win2 = [{ seat: 2 as Seat, x: 0, y: 2 }];
+    for (const board of [win0, win2, win0, []]) {
+      expect(g.phase).toBe('shooting');
+      g = finish(g, board);
+      if (g.phase === 'round-over') g = nextRound(g);
+    }
+    expect(g.scores).toEqual([5, 3]);
+    expect(g.phase).toBe('game-over');
+    expect(g.winner).toBe(0);
+    expect(g.round).toBe(4);
+  });
+
+  it('level after 4 rounds: extra rounds until someone leads', () => {
+    let g = tour();
+    for (let i = 0; i < 4; i++) {
+      g = finish(g, []);
+      expect(g.phase).toBe('round-over');
+      g = nextRound(g);
+    }
+    expect(g.scores).toEqual([4, 4]);
+    g = finish(g, [{ seat: 2, x: 0, y: 2 }]);
+    expect(g.phase).toBe('game-over');
+    expect(g.winner).toBe(1);
+    expect(g.round).toBe(5);
+  });
+
+  it('3 players: the round winner gets 2, players tied for the top get 1 each', () => {
+    const g = finish(tour(3), [
+      { seat: 0, x: 0, y: 2 },
+      { seat: 2, x: 0.3, y: -2.2 },
+      { seat: 1, x: -10, y: 0 },
+    ]);
+    expect(g.lastRound!.tallies.map((t) => t.total)).toEqual([15, 15, 5]);
+    expect(g.scores).toEqual([1, 1, 0]);
+  });
+});

@@ -6,7 +6,7 @@ import '../styles.css';
 import { type BoardKind, type Seat } from '../engine/board';
 import { type Difficulty, chooseShotAsync } from '../engine/ai';
 import { mulberry32 } from '../engine/rng';
-import { type GameState, type PlayerCount, type Shot, createGame, currentSeat, requirement } from '../engine/rules';
+import { type Format, type GameState, type PlayerCount, type Shot, createGame, currentSeat, requirement } from '../engine/rules';
 import { Table } from '../game/table';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { AimInput } from '../ui/aim';
@@ -21,12 +21,20 @@ interface Prefs {
   players: PlayerCount;
   level: Difficulty;
   target: 50 | 100;
+  /** Tournament (NCA) scoring is the default; older saved prefs pick it up too. */
+  format: Format;
   board: BoardKind;
 }
 
 const PREFS_KEY = 'crokinole.prefs';
+type GameLength = 'rounds' | 50 | 100;
+const GAME_LENGTHS: Array<[GameLength, string]> = [
+  ['rounds', '4 rounds'],
+  [50, 'To 50'],
+  [100, 'To 100'],
+];
 function loadPrefs(): Prefs {
-  const d: Prefs = { mode: 'cpu', players: 2, level: 'medium', target: 100, board: 'classic' };
+  const d: Prefs = { mode: 'cpu', players: 2, level: 'medium', target: 100, format: 'tournament', board: 'classic' };
   try {
     return { ...d, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
   } catch {
@@ -95,7 +103,13 @@ function showMenu(): void {
     ),
     row('Players', seg<PlayerCount>([[2, '2'], [3, '3'], [4, '4 (teams)']], prefs.players, (v) => (prefs.players = v))),
     levelRow,
-    row('Game to', seg<50 | 100>([[50, '50'], [100, '100']], prefs.target, (v) => (prefs.target = v))),
+    row(
+      'Game',
+      seg<GameLength>(GAME_LENGTHS, prefs.format === 'tournament' ? 'rounds' : prefs.target, (v) => {
+        prefs.format = v === 'rounds' ? 'tournament' : 'casual';
+        if (v !== 'rounds') prefs.target = v;
+      }),
+    ),
     row('Board', seg<BoardKind>([['classic', 'Classic'], ['five-hole', '5-hole (−10s)']], prefs.board, (v) => (prefs.board = v))),
   );
   levelRow.classList.toggle('hidden', prefs.mode !== 'cpu');
@@ -185,7 +199,7 @@ function startLocal(prefs: Prefs): void {
   tr.append(cameraButton(view), soundBtn, exitBtn);
   hud.root.append(tr);
 
-  const game = createGame({ players: prefs.players, target: prefs.target, board: prefs.board });
+  const game = createGame({ players: prefs.players, target: prefs.target, format: prefs.format, board: prefs.board });
   view.setFiveHole(prefs.board === 'five-hole');
   // ?autoplay (testing): every seat is the computer, shots play fast.
   const autoplay = new URLSearchParams(location.search).has('autoplay');

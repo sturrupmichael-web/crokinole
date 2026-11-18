@@ -17,13 +17,31 @@ import { type Highlight, type SeatStats, emptyStats, recordShot } from './highli
 
 export type PlayerCount = 2 | 3 | 4;
 
+export type Format = 'tournament' | 'casual';
+
 export interface Settings {
   players: PlayerCount;
-  /** First team to reach this at the end of a round wins. */
+  /**
+   * 'tournament' (NCA): 8 discs each in singles, a game is 4 rounds, a round win
+   * scores 2 and a tied round 1 each. 'casual': first to `target`, the round's
+   * points minus the other side's. Missing (older saves) = casual.
+   */
+  format?: Format;
+  /** Casual games: first team to reach this at the end of a round wins. */
   target: 50 | 100;
   /** 'five-hole' adds four −10 holes. Missing = classic. */
   board?: BoardKind;
 }
+
+export function isTournament(s: { settings?: Settings }): boolean {
+  return s.settings?.format === 'tournament';
+}
+
+/** Rounds in a tournament game (NCA 2b). A tie after them plays extra rounds. */
+export const TOURNAMENT_ROUNDS = 4;
+/** Game points for winning / tying a round in tournament scoring (NCA 2a.iv). */
+export const ROUND_WIN_POINTS = 2;
+export const ROUND_TIE_POINTS = 1;
 
 export function isFiveHole(s: { settings: Settings }): boolean {
   return s.settings.board === 'five-hole';
@@ -102,6 +120,12 @@ export interface GameState {
 
 export const DISCS_PER_PLAYER: Record<PlayerCount, number> = { 2: 12, 3: 8, 4: 6 };
 
+/** Discs each player starts a round with: NCA singles is 8 (rule 4a), traditional casual play 12. */
+export function discsPerPlayer(settings: Settings): number {
+  if (settings.players === 2 && settings.format === 'tournament') return 8;
+  return DISCS_PER_PLAYER[settings.players];
+}
+
 /**
  * Seats in turn order. Play goes clockwise seen from above (NCA rule 2a):
  * from the bottom seat to the left one (3), then the top (2), then the right (1).
@@ -139,7 +163,7 @@ export function createGame(settings: Settings): GameState {
 
 function startRound(prev: GameState, starter: number): GameState {
   const discsLeft: [number, number, number, number] = [0, 0, 0, 0];
-  for (const s of prev.seats) discsLeft[s] = DISCS_PER_PLAYER[prev.settings.players];
+  for (const s of prev.seats) discsLeft[s] = discsPerPlayer(prev.settings);
   return {
     ...prev,
     round: prev.round + 1,
@@ -353,7 +377,7 @@ export function resolveShot(state: GameState, shot: Shot): { state: GameState; o
 }
 
 /** Score the board as it stands (also used by the AI to evaluate candidate shots). */
-export function tallyRound(state: Pick<GameState, 'board' | 'twenties' | 'penalties' | 'teamCount' | 'round' | 'seats'>): RoundResult {
+export function tallyRound(state: Pick<GameState, 'board' | 'twenties' | 'penalties' | 'teamCount' | 'round' | 'seats'> & { settings?: Settings }): RoundResult {
   const tallies: TeamTally[] = [];
   for (let team = 0; team < state.teamCount; team++) {
     const discs = state.board
@@ -366,7 +390,12 @@ export function tallyRound(state: Pick<GameState, 'board' | 'twenties' | 'penalt
     const penalties = state.penalties?.[team] ?? 0;
     tallies.push({ team, discs, boardPoints, twenties, penalties, total: boardPoints + 20 * twenties - PENALTY_POINTS * penalties, awarded: 0 });
   }
-  if (state.teamCount === 2) {
+  if (isTournament(state)) {
+    // The best round total wins 2 game points; a tie at the top gives each of them 1.
+    const best = Math.max(...tallies.map((t) => t.total));
+    const top = tallies.filter((t) => t.total === best);
+    for (const t of top) t.awarded = top.length === 1 ? ROUND_WIN_POINTS : ROUND_TIE_POINTS;
+  } else if (state.teamCount === 2) {
     const [a, b] = tallies;
     if (a.total > b.total) a.awarded = a.total - b.total;
     else b.awarded = b.total - a.total;
@@ -381,7 +410,7 @@ function endRound(state: GameState): GameState {
   const scores = state.scores.map((s, team) => s + result.tallies[team].awarded);
   const best = Math.max(...scores);
   const leaders = scores.flatMap((s, team) => (s === best ? [team] : []));
-  const over = best >= state.settings.target && leaders.length === 1;
+  const over = leaders.length === 1 && (isTournament(state) ? state.round >= TOURNAMENT_ROUNDS : best >= state.settings.target);
   return {
     ...state,
     scores,
