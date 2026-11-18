@@ -156,6 +156,8 @@ function startLocal(prefs: Prefs): void {
     sfx.setEnabled(!sfx.enabled);
     soundBtn.textContent = sfx.enabled ? '🔊' : '🔇';
   });
+  const meter = el('div', 'meter local-meter hidden', '<div class="fill"></div><span></span>');
+  stage.append(meter);
   // Tap the board to skip a replay.
   canvas.addEventListener('pointerdown', () => table?.skipReplay());
   const exitBtn = el('button', 'iconbtn', '✕');
@@ -205,8 +207,18 @@ function startLocal(prefs: Prefs): void {
   if (autoplay) table.speed = 6;
   (window as unknown as { __table: Table }).__table = table;
   const aim = new AimInput(view, {
-    onPreview: (shot) => (preview = { shot, team: table.state.teamOfSeat[shot.seat] }),
+    onPreview: (shot, pulling) => {
+      preview = { shot, team: table.state.teamOfSeat[shot.seat] };
+      meter.classList.toggle('hidden', !pulling);
+      if (pulling) {
+        const fill = meter.firstElementChild as HTMLElement;
+        fill.style.width = `${Math.round(shot.power * 100)}%`;
+        fill.style.background = `hsl(${120 - 120 * shot.power}, 80%, 50%)`;
+        meter.querySelector('span')!.textContent = `Power ${Math.round(shot.power * 100)}%`;
+      }
+    },
     onShoot: (shot) => {
+      meter.classList.add('hidden');
       sfx.unlock();
       preview = null;
       aim.enable(null);
@@ -281,10 +293,16 @@ function startLocal(prefs: Prefs): void {
     window.removeEventListener('resize', onResize);
     showMenu();
   };
-  const onResize = () => view.resize();
+  // On landscape screens, lift the board so there's room below the shooter's line to pull back.
+  const fitView = () => {
+    const landscape = window.innerWidth > window.innerHeight * 1.05;
+    view.fit = landscape ? { r: 19, offsetY: -2 } : { r: 17.7, offsetY: 0 };
+    view.resize();
+  };
+  const onResize = () => fitView();
   window.addEventListener('resize', onResize);
   view.faceSeat(prefs.mode === 'pass' ? currentSeat(game) : 0, true);
-  view.resize();
+  fitView();
   hud.renderScores(game, names);
 
   let last = performance.now();

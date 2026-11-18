@@ -9,8 +9,19 @@ import type { Shot } from '../engine/rules';
 import type { BoardView } from '../render/view';
 
 /** Screen pixels of pull for full power, scaled to the screen so phones and TVs feel alike. */
-function fullPullPx(): number {
+function maxPullPx(): number {
   return Math.max(150, Math.min(280, 0.46 * Math.min(window.innerWidth, window.innerHeight)));
+}
+
+/**
+ * Pull length for full power for a drag starting at `y` (viewport px). The
+ * shooter always sits at the bottom of the screen, so a pull heads down: fit
+ * full power into the room left below the press, so you never have to drag
+ * off the screen (a press low on the screen just makes the pull more sensitive).
+ */
+function fullPullFrom(y: number): number {
+  const room = window.innerHeight - y - 14;
+  return Math.max(110, Math.min(maxPullPx(), room));
 }
 const DEADZONE_PX = 12;
 
@@ -28,6 +39,7 @@ export class AimInput {
   private mode: 'none' | 'undecided' | 'slide' | 'pull' = 'none';
   private start = { x: 0, y: 0 };
   private startPx = { x: 0, y: 0 };
+  private fullPx = 200;
   private startPos = 0.5;
   private pointerId: number | null = null;
   private lastTick = 0;
@@ -69,6 +81,7 @@ export class AimInput {
     const w = this.world(e);
     this.start = w;
     this.startPx = { x: e.clientX, y: e.clientY };
+    this.fullPx = fullPullFrom(e.clientY);
     this.startPos = this.baselinePos;
     const disc = arcPoint(this.seat, this.baselinePos);
     const onDisc = Math.hypot(w.x - disc.x, w.y - disc.y) < BOARD.discR * 2.4;
@@ -124,7 +137,7 @@ export class AimInput {
     let angle = seatAngle(this.seat!) + Math.PI - dir;
     angle = Math.atan2(Math.sin(angle), Math.cos(angle));
     angle = clamp(angle, -PHYSICS.maxAimAngle, PHYSICS.maxAimAngle);
-    const power = clamp((px - DEADZONE_PX) / fullPullPx(), 0, 1);
+    const power = clamp((px - DEADZONE_PX) / this.fullPx, 0, 1);
     return this.shot(angle, power);
   }
 
