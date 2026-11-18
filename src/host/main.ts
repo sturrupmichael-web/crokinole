@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import type { Seat } from '../engine/board';
 import { type Difficulty, chooseShotAsync } from '../engine/ai';
 import { mulberry32 } from '../engine/rng';
-import { type GameState, type PlayerCount, type Shot, createGame, currentSeat, requirement } from '../engine/rules';
+import { type GameState, type PlayerCount, type Shot, SEAT_ORDER, createGame, currentSeat, requirement } from '../engine/rules';
 import { Table } from '../game/table';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { Sfx } from '../ui/audio';
@@ -29,7 +29,6 @@ import { trackPresence } from '../net/presence';
 const SAVE_KEY = 'crokinole.host.v1';
 const SAVE_MAX_AGE = 6 * 3600 * 1000;
 const CPU_LEVEL: Difficulty = 'medium';
-const SEATS: Record<PlayerCount, Seat[]> = { 2: [0, 2], 3: [0, 1, 2], 4: [0, 1, 2, 3] };
 
 interface Saved {
   room: string;
@@ -412,7 +411,8 @@ function startGame(): void {
   if (n < 2 || n > 4) return;
   hud.hideModal();
   rs.seatPlayer = [null, null, null, null];
-  SEATS[n].forEach((seat, i) => (rs.seatPlayer[seat] = i));
+  // Lobby order is turn order.
+  SEAT_ORDER[n].forEach((seat, i) => (rs.seatPlayer[seat] = i));
   const game = createGame({ players: n, target: rs.target, board: rs.board ?? 'classic' });
   view.setFiveHole(game.settings.board === 'five-hole');
   rs.phase = 'playing';

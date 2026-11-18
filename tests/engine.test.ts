@@ -257,7 +257,9 @@ describe('teams', () => {
     expect(two.seats).toEqual([0, 2]);
     expect(two.discsLeft).toEqual([12, 0, 12, 0]);
     const three = createGame({ players: 3, target: 100 });
-    expect(three.teamOfSeat).toEqual([0, 1, 2, -1]);
+    // Teams follow clockwise turn order: bottom (0), top (2), right (1).
+    expect(three.seats).toEqual([0, 2, 1]);
+    expect(three.teamOfSeat).toEqual([0, 2, 1, -1]);
     expect(three.discsLeft).toEqual([8, 8, 8, 0]);
     const four = createGame({ players: 4, target: 100 });
     expect(four.teamOfSeat).toEqual([0, 1, 0, 1]);
@@ -298,8 +300,8 @@ describe('round scoring', () => {
     let g = createGame({ players: 3, target: 100 });
     g = place(g, [
       { seat: 0, x: 0, y: 2 },
-      { seat: 1, x: 6, y: 0 },
-      { seat: 2, x: -10, y: 0 },
+      { seat: 2, x: 6, y: 0 },
+      { seat: 1, x: -10, y: 0 },
     ]);
     expect(tallyRound(g).tallies.map((t) => t.awarded)).toEqual([15, 10, 5]);
   });

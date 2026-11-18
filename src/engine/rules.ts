@@ -102,11 +102,16 @@ export interface GameState {
 
 export const DISCS_PER_PLAYER: Record<PlayerCount, number> = { 2: 12, 3: 8, 4: 6 };
 
-const SEATS: Record<PlayerCount, Seat[]> = { 2: [0, 2], 3: [0, 1, 2], 4: [0, 1, 2, 3] };
+/**
+ * Seats in turn order. Play goes clockwise seen from above (NCA rule 2a):
+ * from the bottom seat to the left one (3), then the top (2), then the right (1).
+ */
+export const SEAT_ORDER: Record<PlayerCount, Seat[]> = { 2: [0, 2], 3: [0, 2, 1], 4: [0, 3, 2, 1] };
 
 export function createGame(settings: Settings): GameState {
-  const seats = SEATS[settings.players];
+  const seats = SEAT_ORDER[settings.players];
   const teamOfSeat: [number, number, number, number] = [-1, -1, -1, -1];
+  // Teams follow turn order (partners sit opposite in 4p, so they alternate).
   seats.forEach((s, i) => (teamOfSeat[s] = settings.players === 4 ? s % 2 : i));
   const teamCount = settings.players === 3 ? 3 : 2;
   const state: GameState = {
@@ -196,7 +201,7 @@ export interface LiveShot {
   team: number;
   requirement: Requirement;
   sim: Sim;
-  /** Shooter-team discs set moving by the shot (the shot disc, and any own disc it — or they — hit). */
+  /** Shooter-team discs struck during the shot (the shot disc, and any own disc it — or they — hit). */
   chain: Set<number>;
   hitOpponent: boolean;
 }
@@ -238,7 +243,10 @@ export interface ShotOutcome {
   team: number;
   requirement: Requirement;
   foul: boolean;
-  /** The shot disc failed to reach the 15 on an open board. */
+  /**
+   * Open board, and neither the shot disc nor any disc it struck ended touching
+   * or inside the 15 line (or in the 20): the shot disc and the struck discs are removed.
+   */
   short: boolean;
   /** 20s banked by this shot (disc id + team). Excludes 20s voided by a foul. */
   twenties: Array<{ id: number; team: number }>;
@@ -275,11 +283,15 @@ export function finishShot(state: GameState, live: LiveShot): { state: GameState
     for (const d of survivors) if (live.chain.has(d.id)) removed.push({ id: d.id, reason: 'foul' });
     survivors = survivors.filter((d) => !live.chain.has(d.id));
   } else if (live.requirement === 'reach-15') {
-    const shotDisc = survivors.find((d) => d.id === shotId);
-    if (shotDisc && !reaches15(Math.hypot(shotDisc.x, shotDisc.y))) {
+    // NCA 3a.ii "No hiding": the shot disc, or any disc it struck, must end touching or
+    // inside the 15 line; a 20 counts as inside. Otherwise all of them come off (3b).
+    const made =
+      sim.twenties.some((d) => live.chain.has(d.id)) ||
+      survivors.some((d) => live.chain.has(d.id) && reaches15(Math.hypot(d.x, d.y)));
+    if (!made) {
       short = true;
-      removed.push({ id: shotId, reason: 'short' });
-      survivors = survivors.filter((d) => d.id !== shotId);
+      for (const d of survivors) if (live.chain.has(d.id)) removed.push({ id: d.id, reason: 'short' });
+      survivors = survivors.filter((d) => !live.chain.has(d.id));
     }
   }
 

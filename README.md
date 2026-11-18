@@ -115,15 +115,21 @@ penalty holes to the classic board:
 
 ## Rules as implemented
 
+Checked against the NCA Official Rules of Crokinole and the World Crokinole Championship rules;
+`tests/standard-rules.test.ts` plays each rule through the real physics (rule numbers in the
+test names). Where the game differs on purpose, it says so below.
+
 - **Seats and discs.** 2 players sit opposite with 12 discs each. 3 players play
   free-for-all with 8 each. 4 players play as partners sitting opposite, with 6 each.
-- **Turns.** Players alternate shots; the round ends when every disc has been shot. The
-  starting player rotates each round.
+- **Turns.** Play goes clockwise seen from above (bottom seat, then the left, top and right).
+  The round ends when every disc has been shot. The first shot alternates each round in singles
+  and moves one seat clockwise in doubles.
 - **Opponent on the board.** The shot must hit an opponent's disc, directly or through your own
   (or your partner's) discs it set moving. Otherwise it's a **foul**: the shot disc and every one
   of your team's discs it touched are removed, and a 20 made on the foul doesn't count.
-- **Open board.** The shot disc must end touching or inside the 15 circle, or drop in the
-  20 hole. Otherwise it's removed.
+- **Open board ("no hiding").** The shot disc, or one of your discs it struck, must end
+  touching or inside the 15 circle, or drop in the 20 hole. Otherwise the shot disc and the
+  discs it struck are removed.
 - **Ditch.** A disc whose centre passes the edge of the playing surface is removed.
 - **20 hole.** A slow enough disc whose centre comes near dead centre drops and is banked as a
   20 for its owner.
@@ -133,6 +139,9 @@ penalty holes to the classic board:
   their own total.
 - **Winning.** The first side to the target (50 or 100) at the end of a round wins. A tie at the
   top plays another round.
+- **Differences from tournament play (deliberate):** singles uses the traditional 12 discs each
+  (NCA singles uses 8); games run to 100 with cancellation scoring instead of NCA's 4-round
+  games scored 2/1/0 per round; 3-player free-for-all and the 5-hole board are house variants.
 
 ## Engine
 
