@@ -24,6 +24,7 @@ import {
   pidKey,
 } from '../net/protocol';
 import { createTransport, hasSupabase } from '../net/transport';
+import { trackPresence } from '../net/presence';
 
 const SAVE_KEY = 'crokinole.host.v1';
 const SAVE_MAX_AGE = 6 * 3600 * 1000;
@@ -75,6 +76,7 @@ const lastSeen = new Map<number, number>();
 for (const p of rs.players) p.connected = p.cpu;
 
 const transport = createTransport(room);
+trackPresence('host');
 const sfx = new Sfx();
 const rng = mulberry32((Date.now() ^ 0x9e3779b9) >>> 0);
 

@@ -13,6 +13,7 @@ import { AimInput } from '../ui/aim';
 import { Sfx } from '../ui/audio';
 import { Hud, REQ_TEXT, el, esc } from '../ui/hud';
 import { normalizeRoomCode } from '../net/protocol';
+import { onPlayerCount, trackPresence } from '../net/presence';
 
 type Mode = 'cpu' | 'pass';
 interface Prefs {
@@ -58,11 +59,20 @@ function seg<T extends string | number>(options: Array<[T, string]>, value: T, o
 }
 
 function showMenu(): void {
+  trackPresence('menu');
   const prefs = loadPrefs();
   app.innerHTML = '';
   const wrap = el('div', 'menu');
   const card = el('div', 'card');
   card.innerHTML = `<div class="disc-logo"></div><h1>Crokinole</h1><p class="tag">Flick your discs at the 20 hole. Knock theirs into the ditch.</p>`;
+  const live = el('p', 'live hidden');
+  card.append(live);
+  // "N playing now" across everyone on Crokinole (menus, local games, phones), shown from 2 up.
+  const stopLive = onPlayerCount((n) => {
+    if (wrap.dataset.shown && !wrap.isConnected) return void stopLive();
+    live.innerHTML = `<span class="dot"></span>${n} playing now`;
+    live.classList.toggle('hidden', n < 2);
+  });
 
   const row = (label: string, control: HTMLElement) => {
     const r = el('div', 'row');
@@ -139,9 +149,11 @@ function showMenu(): void {
   );
   wrap.append(card);
   app.append(wrap);
+  wrap.dataset.shown = '1';
 }
 
 function startLocal(prefs: Prefs): void {
+  trackPresence('local');
   app.innerHTML = '';
   const stage = el('div', 'stage');
   const canvas = el('canvas');

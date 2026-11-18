@@ -13,6 +13,9 @@ import { AimInput } from '../ui/aim';
 import { REQ_TEXT, awardsHtml, el, esc, shownScores, teamLabel, verb } from '../ui/hud';
 import { type PhoneMsg, type RoomState, cleanName, isRoomCode, normalizeRoomCode, pidKey, seatOfKey } from '../net/protocol';
 import { type Transport, createTransport, hasSupabase } from '../net/transport';
+import { trackPresence } from '../net/presence';
+
+trackPresence('phone');
 
 const app = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);

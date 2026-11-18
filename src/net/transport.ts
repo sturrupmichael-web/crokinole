@@ -34,11 +34,18 @@ export function createTransport(room: string): Transport {
   return hasSupabase() ? supabaseTransport(room) : localTransport(room);
 }
 
-function supabaseTransport(room: string): Transport {
+/** One shared Supabase client per page (null without env vars). */
+export function supabaseClient(): SupabaseClient | null {
+  if (!hasSupabase()) return null;
   client ??= createClient(URL!, KEY!, {
     realtime: { params: { eventsPerSecond: 30 } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  return client;
+}
+
+function supabaseTransport(room: string): Transport {
+  const client = supabaseClient()!;
   const handlers = new Map<string, Handler[]>();
   const channel: RealtimeChannel = client.channel(channelName(room), {
     config: { broadcast: { self: false, ack: false } },
