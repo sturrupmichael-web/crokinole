@@ -40,7 +40,7 @@ export const PHYSICS = {
   /** A disc drops in the 20 hole when its centre comes this close to dead centre… */
   holeCaptureR: 0.3,
   /** …and it is moving slower than this (faster discs skip across the hole). */
-  holeMaxSpeed: 40,
+  holeMaxSpeed: 14,
   /** Below this speed a disc stops. */
   stopSpeed: 0.05,
   /** Safety cap on one shot's simulated time. */

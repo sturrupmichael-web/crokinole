@@ -1,0 +1,131 @@
+:root {
+  --bg: #1b120b;
+  --bg2: #2b1d12;
+  --ink: #fbeed3;
+  --muted: #c9b089;
+  --accent: #f0b54a;
+  --accent-ink: #2a1a0a;
+  --card: rgba(34, 22, 12, 0.94);
+  --line: rgba(251, 238, 211, 0.16);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 40%, #3a2716 0%, var(--bg) 70%); overflow: hidden; }
+body { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+button { font: inherit; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+
+.btn {
+  appearance: none; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: var(--ink);
+  padding: 12px 18px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; min-height: 46px;
+}
+.btn:hover { background: rgba(255, 255, 255, 0.12); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.small { padding: 6px 12px; min-height: 34px; font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.seg button { appearance: none; border: 0; background: transparent; color: var(--ink); padding: 10px 16px; font-weight: 700; cursor: pointer; min-height: 44px; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+
+/* Board stage */
+.stage { position: fixed; inset: 0; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* HUD */
+.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.scoreboard { position: absolute; top: 12px; left: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; min-width: 170px; max-width: 46vw; }
+.scoreboard:empty { display: none; }
+.scoreboard .team, .trow { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 15px; }
+.scoreboard .team b, .trow b { margin-left: auto; font-size: 20px; font-variant-numeric: tabular-nums; }
+.scoreboard .team.lead { color: var(--accent); }
+.scoreboard .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.tname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 3px rgba(0,0,0,0.4); }
+.banner { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--card); border: 2px solid transparent; border-radius: 999px; padding: 8px 18px; font-size: 16px; white-space: nowrap; pointer-events: none; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; }
+.banner .req { color: var(--accent); font-weight: 700; }
+.callout { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(36px, 9vmin, 96px); font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 4px 0 rgba(0,0,0,0.5), 0 0 30px rgba(0,0,0,0.6); opacity: 0; pointer-events: none; white-space: nowrap; }
+.callout.pop { animation: pop 1.6s ease-out forwards; }
+@keyframes pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 22% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
+.topright { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+.iconbtn { appearance: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 20px; cursor: pointer; display: grid; place-items: center; }
+
+.tally { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; width: min(300px, calc(100vw - 24px)); }
+.tally h2 { margin: 0 0 6px; font-size: 18px; }
+.tally .award { margin: 10px 0; font-size: 16px; }
+.tally .btn { width: 100%; }
+
+.modal { position: absolute; inset: 0; background: rgba(10, 6, 3, 0.6); display: grid; place-items: center; padding: 16px; }
+.modal .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; width: min(420px, 100%); text-align: center; max-height: 100%; overflow: auto; }
+.modal h2 { margin: 6px 0 12px; }
+.modal .trow { text-align: left; }
+.modal .btns { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+.trophy { font-size: 54px; }
+
+/* Menu */
+.menu { position: fixed; inset: 0; overflow: auto; display: grid; place-items: center; padding: 24px 16px; }
+.menu .card { width: min(460px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px 22px; }
+.menu h1 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 44px; letter-spacing: 0.01em; text-align: center; }
+.menu .tag { text-align: center; color: var(--muted); margin: 4px 0 18px; }
+.menu .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+.menu .row label { color: var(--muted); font-weight: 600; }
+.menu .actions { display: grid; gap: 10px; margin-top: 18px; }
+.menu .divider { height: 1px; background: var(--line); margin: 20px 0 6px; }
+.menu h3 { margin: 14px 0 4px; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.menu input { font: inherit; font-size: 18px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,0.25); color: var(--ink); width: 100%; }
+.menu .join { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+.menu .howto { font-size: 14px; color: var(--muted); line-height: 1.5; }
+.menu .howto b { color: var(--ink); }
+.disc-logo { width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ef7a6f, #c8372d 60%, #6d1a14); box-shadow: inset 0 0 0 9px rgba(0,0,0,0.12), 0 6px 16px rgba(0,0,0,0.5); }
+
+@media (max-width: 600px) {
+  .scoreboard { top: 8px; left: 8px; padding: 6px 10px; min-width: 0; font-size: 13px; }
+  .scoreboard .team b { font-size: 17px; }
+  .banner { font-size: 14px; bottom: 10px; padding: 6px 14px; }
+  .tally { top: auto; bottom: 56px; transform: none; right: 8px; left: 8px; width: auto; }
+}
+
+.warn { color: #ffb35b; }
+.small { font-size: 13px; }
+
+/* Host lobby */
+.lobby { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(12, 7, 3, 0.55); backdrop-filter: blur(2px); }
+.lobby-card { display: grid; grid-template-columns: auto minmax(280px, 380px); gap: 36px; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 30px 34px; max-width: 100%; max-height: 100%; overflow: auto; }
+.join-col { text-align: center; }
+.kicker { text-transform: uppercase; letter-spacing: 0.12em; font-size: 13px; color: var(--muted); font-weight: 700; margin-top: 6px; }
+.url { font-size: 24px; font-weight: 700; margin: 4px 0 14px; }
+.code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: clamp(56px, 9vw, 96px); font-weight: 800; letter-spacing: 0.12em; color: var(--accent); line-height: 1.05; }
+.qr { width: 190px; height: 190px; border-radius: 14px; margin-top: 14px; image-rendering: pixelated; }
+.players-col h2 { margin: 0 0 10px; }
+.players { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 8px; }
+.players li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 18px; font-weight: 600; min-height: 50px; }
+.players li small { margin-left: auto; }
+.players li .btn { margin-left: 6px; }
+.players li.empty { border-style: dashed; font-weight: 400; }
+.players li.empty .dot { background: rgba(255, 255, 255, 0.12); box-shadow: none; }
+.players-col .row { display: flex; align-items: center; justify-content: space-between; margin: 14px 0; }
+.lobby-actions { display: grid; gap: 10px; }
+@media (max-width: 760px) { .lobby-card { grid-template-columns: 1fr; gap: 18px; padding: 20px; } }
+
+/* Phone controller */
+.phone { position: fixed; inset: 0; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.phone-top { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--card); font-size: 16px; flex-wrap: wrap; }
+.phone-top .scores { margin-left: auto; display: flex; gap: 10px; font-weight: 800; }
+.phone-top .scores span { display: inline-flex; align-items: center; gap: 4px; }
+.phone-top .scores .dot { width: 10px; height: 10px; display: inline-block; }
+.phone-stage { position: relative; flex: 1; min-height: 0; }
+.phone-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.phone-status { padding: 12px 16px 18px; text-align: center; display: grid; gap: 4px; min-height: 92px; align-content: center; background: var(--card); border-top: 1px solid var(--line); font-size: 15px; }
+.phone-status b { font-size: 20px; }
+.phone-status .go { color: var(--accent); font-size: 26px; }
+.phone-status .req { color: var(--accent); font-weight: 700; }
+.phone-status .news { color: #ffb35b; font-weight: 800; font-size: 18px; }
+.meter { position: absolute; left: 16px; right: 16px; bottom: calc(110px + env(safe-area-inset-bottom)); height: 26px; border-radius: 13px; background: rgba(0,0,0,0.55); border: 1px solid var(--line); overflow: hidden; pointer-events: none; }
+.meter .fill { height: 100%; width: 0; }
+.meter span { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 14px; text-shadow: 0 1px 2px #000; }
+.phone-overlay { position: absolute; left: 12px; right: 12px; top: 64px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.phone-overlay h2 { margin: 4px 0 8px; }
+.plist { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; font-size: 17px; }

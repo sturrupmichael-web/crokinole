@@ -4,25 +4,63 @@ A browser Crokinole game built as a party game. A host screen (a laptop on the T
 board and a room code, and 2–4 players join on their phones and flick discs from them.
 There is also a single-device local mode: pass-and-play, or play against the computer.
 
-Served at **https://michaelsturrup.com/crokinole/** (unlisted until it's finished).
+Served at **https://michaelsturrup.com/crokinole/**:
+
+| Page | What it is |
+| --- | --- |
+| `/crokinole/` | Menu and local mode: vs. computer (Easy/Medium/Hard) or pass-and-play, 2–4 players |
+| `/crokinole/host/` | Party-mode host screen: room code, QR, lobby, the board |
+| `/crokinole/join/` | Phone controller (the QR code opens it with the room filled in) |
 
 ## Status
 
 | Milestone | State |
 | --- | --- |
 | 1. Physics + rules engine with unit tests | ✅ done |
-| 2. Local mode: rendering, touch/mouse controls, vs. AI, pass-and-play | next |
-| 3. Party mode: lobby, room codes, phone controller, host sync (Supabase Realtime) | |
-| 4. Polish: sound, animations, end-of-game screen, site game picker | |
+| 2. Local mode: rendering, touch/mouse controls, vs. AI, pass-and-play | ✅ done |
+| 3. Party mode: lobby, room codes, phone controller, host sync (Supabase Realtime) | ✅ done |
+| 4. Polish: sound, animations, end-of-game screen, site game picker | ✅ done |
+
+## Controls
+
+Drag your disc along the shooting line to place it. Then pull back like a slingshot (from the
+disc, or from anywhere on the screen) and let go. The pull's direction aims and its length sets
+the power. Drag back to where you started to cancel. On phones, the power meter shows the pull
+and each 10% step gives a haptic tick where supported.
+
+## Party mode
+
+1. Open `/crokinole/host/` on the laptop driving the TV. It shows a room code and a QR code.
+2. Players open `michaelsturrup.com/crokinole/join` (or scan) and enter the code and a name.
+3. Add computer players from the lobby if you're short, pick 50 or 100, and press **Start game**.
+
+- **The host is authoritative.** Phones send only `{ baselinePos, angle, power }` (plus a
+  low-rate aim preview, drawn as a ghost on the TV). The host runs the physics and the rules,
+  then broadcasts the room state. Each shot carries the turn number, so a repeated send can't
+  shoot twice.
+- **Rejoining.** A phone that drops reconnects on its own. A new phone or a cleared browser gets
+  the same seat back by joining with the same name. Players who are away are labelled on the
+  board. The host menu (☰) can hand a stuck player's turns to the computer, and give the seat
+  back later.
+- **Host refresh.** The host saves the room to `localStorage` after every shot and reopens the
+  same room code and game when reloaded. A shot that was mid-flight is simply taken again.
+- **Realtime.** Supabase Realtime broadcast only: no tables and no auth. One public channel per
+  room, `crokinole:<CODE>`. The URL and publishable key live in the committed `.env`. Without them
+  (for example `VITE_SUPABASE_URL= npm run dev`) the game falls back to `BroadcastChannel`, so the
+  host and the "phones" must be tabs in one browser. That's handy for testing on one machine.
 
 ## Local development
 
 ```bash
 npm install
-npm test           # engine unit tests (vitest)
+npm run dev        # http://localhost:5173/crokinole/  (host: /crokinole/host/, phone: /crokinole/join/)
+npm test           # engine + AI unit tests (vitest)
 npm run typecheck
 npm run build      # type-check + static build into dist/
 ```
+
+`/crokinole/?autoplay` makes every seat a computer player at 6× speed, which is handy for checking
+rounds, the tally and the end screen.
 
 ## Rules as implemented
 
@@ -51,7 +89,13 @@ npm run build      # type-check + static build into dist/
 src/engine/board.ts    Board geometry in inches, every physics number, zone scoring
 src/engine/physics.ts  Sim: fixed 1/240 s step, substeps, disc/peg collisions, ditch, 20 hole
 src/engine/rules.ts    Game state, turns, requirements, fouls, removals, round tally, game end
-tests/engine.test.ts   Unit tests
+src/engine/ai.ts       Computer opponent
+src/game/table.ts      Animates shots with the same Sim, sound/callouts, disc-by-disc tally
+src/render/            Board art (pre-rendered once) and the live view
+src/ui/                Slingshot input, HUD, synthesised sound effects
+src/local/ src/host/ src/phone/   The three pages
+src/net/               Wire protocol and transport (Supabase Realtime / BroadcastChannel)
+tests/                 Unit tests
 ```
 
 - **Pure and deterministic.** There's no DOM, `Math.random` or wall-clock time. Each tick is
@@ -68,6 +112,15 @@ tests/engine.test.ts   Unit tests
 
 All tunable numbers (friction, restitution, 20-hole capture radius and speed) are in
 `src/engine/board.ts`.
+
+## Computer opponent
+
+The AI samples candidate shots. Some are aimed at each opponent disc or the 20 hole, and the
+rest are random. It runs each one through the real physics and rules and scores the board that
+results: its own points minus the best opponent's, a large penalty for fouls and short shots, and
+a bonus for 20s. It then re-tests the six best with its own wobble and picks the one that holds up
+best on average, so it avoids shots that only work when they're perfect. Difficulty sets the
+number of candidates (40 / 150 / 400) and how much random wobble goes into the shot.
 
 ## Deploying
 
