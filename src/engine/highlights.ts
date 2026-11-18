@@ -18,10 +18,18 @@ export interface SeatStats {
   bestTakeout: number;
   /** Most peg hits in a single shot. */
   bestPegs: number;
+  /** Opponent discs knocked into a −10 hole (5-hole board). */
+  sunk?: number;
+  /** Own-side discs that ended in a −10 hole on this seat's shots. */
+  selfSunk?: number;
 }
 
 export interface ShotSummary {
   twenties: number;
+  /** Opponent discs sent into a −10 hole. */
+  sunk: number;
+  /** Own-side discs that went into a −10 hole. */
+  selfSunk: number;
   takeouts: number;
   pegHits: number;
   clacks: number;
@@ -44,7 +52,7 @@ export interface Highlight {
 export const REPLAY_THRESHOLD = 12;
 
 export function emptyStats(): SeatStats[] {
-  return Array.from({ length: 4 }, () => ({ shots: 0, twenties: 0, takeouts: 0, fouls: 0, bestTakeout: 0, bestPegs: 0 }));
+  return Array.from({ length: 4 }, () => ({ shots: 0, twenties: 0, takeouts: 0, fouls: 0, bestTakeout: 0, bestPegs: 0, sunk: 0, selfSunk: 0 }));
 }
 
 const COUNT = ['', 'single', 'double', 'triple', 'quadruple', 'quintuple'];
@@ -55,6 +63,9 @@ export function summarizeShot(board: BoardDisc[], outcome: ShotOutcome): ShotSum
     (r) => (r.reason === 'ditch' || r.reason === 'shooting-line') && teamOf.has(r.id) && teamOf.get(r.id) !== outcome.team,
   ).length;
   const twenties = outcome.twenties.filter((t) => t.team === outcome.team).length;
+  const pens = outcome.penalties ?? [];
+  const sunk = pens.filter((p) => p.team !== outcome.team).length;
+  const selfSunk = pens.length - sunk;
   const pegHits = outcome.events.filter((e) => e.kind === 'peg').length;
   const clacks = outcome.events.filter((e) => e.kind === 'disc').length;
   let score = 0;
@@ -62,14 +73,18 @@ export function summarizeShot(board: BoardDisc[], outcome: ShotOutcome): ShotSum
     score = 12 * twenties + 7 * takeouts + (takeouts >= 2 ? 10 * (takeouts - 1) : 0) + Math.min(pegHits, 4) + Math.min(clacks, 6) * 0.5;
     // A 20 that also took discs out is the dream shot.
     if (twenties && takeouts) score += 8;
+    score += 12 * sunk;
+    if (selfSunk) score = Math.max(0, score - 6 * selfSunk);
   }
   const parts: string[] = [];
   if (takeouts === 1) parts.push('a takeout');
   else if (takeouts > 1) parts.push(`a ${COUNT[takeouts] ?? `${takeouts}×`} takeout`);
   if (twenties === 1) parts.push('a 20');
   else if (twenties > 1) parts.push(`${twenties} 20s`);
+  if (sunk === 1) parts.push('a −10 for the other side');
+  else if (sunk > 1) parts.push(`${sunk}× −10 for the other side`);
   const label = parts.length ? parts.join(' and ') : pegHits >= 3 ? 'a pinball run' : 'a nice shot';
-  return { twenties, takeouts, pegHits, clacks, score, label };
+  return { twenties, sunk, selfSunk, takeouts, pegHits, clacks, score, label };
 }
 
 /** Fold one shot into the seat stats and the round highlight. */
@@ -86,6 +101,8 @@ export function recordShot(
   if (outcome.foul) s.fouls++;
   s.bestTakeout = Math.max(s.bestTakeout, summary.takeouts);
   s.bestPegs = Math.max(s.bestPegs, summary.pegHits);
+  s.sunk = (s.sunk ?? 0) + summary.sunk;
+  s.selfSunk = (s.selfSunk ?? 0) + summary.selfSunk;
   let highlight = before.highlight ?? null;
   if (summary.score >= REPLAY_THRESHOLD && summary.score > (highlight?.score ?? 0)) {
     highlight = {
@@ -126,5 +143,7 @@ export function gameAwards(state: GameState): Award[] {
     pick('Biggest takeout', (s) => s.bestTakeout, (v) => `${plural(v, 'disc', 'discs')} cleared in one shot`, 2),
     pick('Pinball wizard', (s) => s.bestPegs, (v) => `${v} peg hits in one shot`, 3),
     pick('Foul magnet', (s) => s.fouls, (v) => plural(v, 'foul', 'fouls'), 2),
+    pick('Sinker', (s) => s.sunk ?? 0, (v) => `${plural(v, 'opponent disc', 'opponent discs')} sent into a −10 hole`),
+    pick('Butterfingers', (s) => s.selfSunk ?? 0, (v) => `${plural(v, 'own disc', 'own discs')} lost to a −10 hole`),
   ].filter((a): a is Award => a !== null);
 }

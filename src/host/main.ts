@@ -63,6 +63,7 @@ let rs: RoomState = resume?.rs ?? {
   players: [],
   seatPlayer: [null, null, null, null],
   target: 100,
+  board: 'classic',
   game: null,
   moving: false,
   tallying: false,
@@ -378,6 +379,9 @@ function renderLobby(): void {
         <div class="row"><label class="muted">Game to</label>
           <div class="seg"><button data-target="50" class="${rs.target === 50 ? 'on' : ''}">50</button><button data-target="100" class="${rs.target === 100 ? 'on' : ''}">100</button></div>
         </div>
+        <div class="row"><label class="muted">Board</label>
+          <div class="seg"><button data-board="classic" class="${rs.board !== 'five-hole' ? 'on' : ''}">Classic</button><button data-board="five-hole" class="${rs.board === 'five-hole' ? 'on' : ''}">5-hole (−10s)</button></div>
+        </div>
         <div class="lobby-actions">
           <button class="btn" data-act="cpu" ${n >= MAX_PLAYERS ? 'disabled' : ''}>Add computer player</button>
           <button class="btn primary" data-act="start" ${n < 2 ? 'disabled' : ''}>${n < 2 ? 'Need 2+ players' : 'Start game'}</button>
@@ -386,6 +390,13 @@ function renderLobby(): void {
       </div>
     </div>`;
   lobby.querySelectorAll<HTMLButtonElement>('[data-kick]').forEach((b) => b.addEventListener('click', () => removePlayer(Number(b.dataset.kick))));
+  lobby.querySelectorAll<HTMLButtonElement>('[data-board]').forEach((b) =>
+    b.addEventListener('click', () => {
+      rs.board = b.dataset.board === 'five-hole' ? 'five-hole' : 'classic';
+      view.setFiveHole(rs.board === 'five-hole');
+      broadcast();
+    }),
+  );
   lobby.querySelectorAll<HTMLButtonElement>('[data-target]').forEach((b) =>
     b.addEventListener('click', () => {
       rs.target = Number(b.dataset.target) as 50 | 100;
@@ -402,7 +413,8 @@ function startGame(): void {
   hud.hideModal();
   rs.seatPlayer = [null, null, null, null];
   SEATS[n].forEach((seat, i) => (rs.seatPlayer[seat] = i));
-  const game = createGame({ players: n, target: rs.target });
+  const game = createGame({ players: n, target: rs.target, board: rs.board ?? 'classic' });
+  view.setFiveHole(game.settings.board === 'five-hole');
   rs.phase = 'playing';
   rs.game = game;
   rs.lastNews = '';
@@ -469,6 +481,7 @@ if (rs.phase === 'playing' && rs.game) {
 
 window.addEventListener('resize', () => view.resize());
 view.faceSeat(0, true);
+view.fiveHole = (rs.game?.settings.board ?? rs.board) === 'five-hole';
 view.resize();
 renderLobby();
 broadcast();

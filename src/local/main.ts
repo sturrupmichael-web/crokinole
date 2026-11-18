@@ -3,7 +3,7 @@
  * computer. Also links to the party-mode host and the phone join page.
  */
 import '../styles.css';
-import { type Seat } from '../engine/board';
+import { type BoardKind, type Seat } from '../engine/board';
 import { type Difficulty, chooseShotAsync } from '../engine/ai';
 import { mulberry32 } from '../engine/rng';
 import { type GameState, type PlayerCount, type Shot, createGame, currentSeat, requirement } from '../engine/rules';
@@ -21,11 +21,12 @@ interface Prefs {
   players: PlayerCount;
   level: Difficulty;
   target: 50 | 100;
+  board: BoardKind;
 }
 
 const PREFS_KEY = 'crokinole.prefs';
 function loadPrefs(): Prefs {
-  const d: Prefs = { mode: 'cpu', players: 2, level: 'medium', target: 100 };
+  const d: Prefs = { mode: 'cpu', players: 2, level: 'medium', target: 100, board: 'classic' };
   try {
     return { ...d, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') };
   } catch {
@@ -95,6 +96,7 @@ function showMenu(): void {
     row('Players', seg<PlayerCount>([[2, '2'], [3, '3'], [4, '4 (teams)']], prefs.players, (v) => (prefs.players = v))),
     levelRow,
     row('Game to', seg<50 | 100>([[50, '50'], [100, '100']], prefs.target, (v) => (prefs.target = v))),
+    row('Board', seg<BoardKind>([['classic', 'Classic'], ['five-hole', '5-hole (−10s)']], prefs.board, (v) => (prefs.board = v))),
   );
   levelRow.classList.toggle('hidden', prefs.mode !== 'cpu');
   const actions = el('div', 'actions');
@@ -183,7 +185,8 @@ function startLocal(prefs: Prefs): void {
   tr.append(soundBtn, exitBtn);
   hud.root.append(tr);
 
-  const game = createGame({ players: prefs.players, target: prefs.target });
+  const game = createGame({ players: prefs.players, target: prefs.target, board: prefs.board });
+  view.setFiveHole(prefs.board === 'five-hole');
   // ?autoplay (testing): every seat is the computer, shots play fast.
   const autoplay = new URLSearchParams(location.search).has('autoplay');
   const isCpu = (seat: Seat) => autoplay || (prefs.mode === 'cpu' && seat !== 0);

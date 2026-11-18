@@ -4,7 +4,7 @@
  * callouts, and runs the disc-by-disc round tally. Used by local mode and by
  * the party-mode host.
  */
-import { BOARD, PHYSICS, type Seat } from '../engine/board';
+import { BOARD, PENALTY_HOLES, PHYSICS, type Seat } from '../engine/board';
 import type { SimDisc } from '../engine/physics';
 import {
   type GameState,
@@ -147,6 +147,12 @@ export class Table {
     for (; seen < sim.events.length; seen++) {
         const e = sim.events[seen];
         this.sfx.event(e);
+        if (e.kind === 'penalty') {
+          const h = PENALTY_HOLES[e.hole];
+          const d = sim.penalties.find((x) => x.id === e.id);
+          if (d && h) this.fx.push({ disc: { id: d.id, team: d.team, x: h.x, y: h.y }, start: performance.now(), dur: 500, kind: 'hole' });
+          if (h) this.view.float(h.x, h.y + 1.1, '−10', '#ff6b5b', 1.8, 1.8);
+        }
         if (e.kind === 'ditch' || e.kind === 'twenty') {
           const d = sim.ditched.find((x) => x.id === e.id) ?? sim.twenties.find((x) => x.id === e.id) ?? before.get(e.id);
           if (d) {

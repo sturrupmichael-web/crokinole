@@ -4,12 +4,12 @@
  * the dark ditch and a walnut rail. World units are inches; seat 0 is at the
  * bottom of the image.
  */
-import { BOARD, PEGS } from '../engine/board';
+import { BOARD, PEGS, PENALTY_HOLES } from '../engine/board';
 import { mulberry32 } from '../engine/rng';
 
 export const VIEW_R = BOARD.railR + 2.2; // margin outside the rail for seat labels and disc stacks
 
-export function renderBoardArt(pxPerInch: number): HTMLCanvasElement {
+export function renderBoardArt(pxPerInch: number, fiveHole = false): HTMLCanvasElement {
   const size = Math.ceil(2 * BOARD.railR * pxPerInch) + 4;
   const c = document.createElement('canvas');
   c.width = c.height = size;
@@ -111,6 +111,35 @@ export function renderBoardArt(pxPerInch: number): HTMLCanvasElement {
   g.beginPath();
   g.arc(0, 0, BOARD.holeR, Math.PI * 0.1, Math.PI * 0.9);
   g.stroke();
+
+  // 5-hole board: four −10 holes (world y is up; the art is y-down, so flip y).
+  if (fiveHole) {
+    for (const h of PENALTY_HOLES) {
+      const x = h.x;
+      const y = -h.y;
+      g.strokeStyle = 'rgba(150,30,20,0.55)';
+      g.lineWidth = Math.max(lw(1.5), 0.06);
+      disc(g, BOARD.holeR + 0.22, x, y);
+      g.stroke();
+      const ph = g.createRadialGradient(x + 0.15, y + 0.15, 0.05, x, y, BOARD.holeR);
+      ph.addColorStop(0, '#000');
+      ph.addColorStop(0.75, '#160806');
+      ph.addColorStop(1, '#5a1e12');
+      g.fillStyle = ph;
+      disc(g, BOARD.holeR, x, y);
+      g.fill();
+      g.save();
+      g.translate(x, y);
+      g.fillStyle = 'rgba(150,30,20,0.42)';
+      g.font = `800 0.62px system-ui, sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      // Label on the outer side of the hole, upright for the nearest seat (bottom/top).
+      const out = Math.hypot(x, y);
+      g.fillText('−10', (x / out) * 1.45, (y / out) * 1.45);
+      g.restore();
+    }
+  }
 
   // Pegs (world y is up; the art is y-down, so flip y).
   for (const p of PEGS) {

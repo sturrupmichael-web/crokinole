@@ -250,6 +250,7 @@ function play(room: string, myName: string): void {
     rs = s;
     lastState = Date.now();
     if (s.game && sentTurn !== -1 && s.game.nextId !== sentTurn) sentTurn = -1;
+    view.setFiveHole((s.game?.settings.board ?? s.board) === 'five-hole');
     const seat = seatOfKey(s, key);
     if (seat != null && seat !== mySeat) {
       view.faceSeat(seat, true);

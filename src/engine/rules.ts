@@ -11,7 +11,7 @@
  *   const { state: next, outcome } = finishShot(state, live);
  * `resolveShot` does all three at once (rules tests, the AI, replays).
  */
-import { ARC_HALF, BOARD, FULL_POWER_SPEED, PHYSICS, type Seat, arcPoint, clamp, onOrBeyondShootingLine, reaches15, seatAngle, zoneScore } from './board';
+import { ARC_HALF, BOARD, type BoardKind, FULL_POWER_SPEED, PENALTY_HOLES, PENALTY_POINTS, PHYSICS, type Seat, arcPoint, clamp, onOrBeyondShootingLine, reaches15, seatAngle, zoneScore } from './board';
 import { Sim, type SimDisc, type SimEvent } from './physics';
 import { type Highlight, type SeatStats, emptyStats, recordShot } from './highlights';
 
@@ -21,6 +21,12 @@ export interface Settings {
   players: PlayerCount;
   /** First team to reach this at the end of a round wins. */
   target: 50 | 100;
+  /** 'five-hole' adds four −10 holes. Missing = classic. */
+  board?: BoardKind;
+}
+
+export function isFiveHole(s: { settings: Settings }): boolean {
+  return s.settings.board === 'five-hole';
 }
 
 /** What a controller sends. */
@@ -50,6 +56,8 @@ export interface TeamTally {
   discs: Array<{ id: number; seat: Seat; x: number; y: number; points: 0 | 5 | 10 | 15 }>;
   boardPoints: number;
   twenties: number;
+  /** Discs that dropped in a −10 hole (5-hole board). */
+  penalties: number;
   total: number;
   /** Points actually added to the game score (the difference, in 2-team games). */
   awarded: number;
@@ -79,6 +87,8 @@ export interface GameState {
   board: BoardDisc[];
   /** 20s banked this round, per team. */
   twenties: number[];
+  /** −10 holes this round, per team (5-hole board). Missing in older saves. */
+  penalties?: number[];
   nextId: number;
   phase: 'shooting' | 'round-over' | 'game-over';
   lastRound: RoundResult | null;
@@ -111,6 +121,7 @@ export function createGame(settings: Settings): GameState {
     discsLeft: [0, 0, 0, 0],
     board: [],
     twenties: new Array(teamCount).fill(0),
+    penalties: new Array(teamCount).fill(0),
     nextId: 1,
     phase: 'round-over',
     lastRound: null,
@@ -132,6 +143,7 @@ function startRound(prev: GameState, starter: number): GameState {
     discsLeft,
     board: [],
     twenties: new Array(prev.teamCount).fill(0),
+    penalties: new Array(prev.teamCount).fill(0),
     phase: 'shooting',
     highlight: null,
   };
@@ -202,7 +214,7 @@ export function beginShot(state: GameState, shot: Shot): LiveShot {
     shotId,
     team,
     requirement: requirement(state, shot.seat),
-    sim: new Sim(discs),
+    sim: new Sim(discs, isFiveHole(state) ? PENALTY_HOLES : []),
     chain: new Set([shotId]),
     hitOpponent: false,
   };
@@ -232,6 +244,8 @@ export interface ShotOutcome {
   twenties: Array<{ id: number; team: number }>;
   /** 20s made on a foul, which don't count. */
   voidedTwenties: number[];
+  /** Discs that dropped in a −10 hole (5-hole board): −10 for the disc's owner, foul or not. */
+  penalties: Array<{ id: number; team: number }>;
   removed: Array<{ id: number; reason: RemovalReason }>;
   /** Physics events for sound and callouts. */
   events: SimEvent[];
@@ -280,6 +294,9 @@ export function finishShot(state: GameState, live: LiveShot): { state: GameState
 
   const newTwenties = state.twenties.slice();
   for (const t of twenties) newTwenties[t.team]++;
+  const penalties = sim.penalties.map((d) => ({ id: d.id, team: d.team }));
+  const newPenalties = (state.penalties ?? new Array(state.teamCount).fill(0)).slice();
+  for (const p of penalties) newPenalties[p.team]++;
   const discsLeft = state.discsLeft.slice() as GameState['discsLeft'];
   discsLeft[live.shot.seat]--;
 
@@ -293,6 +310,7 @@ export function finishShot(state: GameState, live: LiveShot): { state: GameState
     short,
     twenties,
     voidedTwenties,
+    penalties,
     removed,
     events: sim.events,
     duration: sim.time,
@@ -305,6 +323,7 @@ export function finishShot(state: GameState, live: LiveShot): { state: GameState
     highlight,
     board,
     twenties: newTwenties,
+    penalties: newPenalties,
     discsLeft,
     nextId: state.nextId + 1,
     turn: (state.turn + 1) % state.seats.length,
@@ -322,7 +341,7 @@ export function resolveShot(state: GameState, shot: Shot): { state: GameState; o
 }
 
 /** Score the board as it stands (also used by the AI to evaluate candidate shots). */
-export function tallyRound(state: Pick<GameState, 'board' | 'twenties' | 'teamCount' | 'round' | 'seats'>): RoundResult {
+export function tallyRound(state: Pick<GameState, 'board' | 'twenties' | 'penalties' | 'teamCount' | 'round' | 'seats'>): RoundResult {
   const tallies: TeamTally[] = [];
   for (let team = 0; team < state.teamCount; team++) {
     const discs = state.board
@@ -332,7 +351,8 @@ export function tallyRound(state: Pick<GameState, 'board' | 'twenties' | 'teamCo
       .sort((a, b) => a.points - b.points || a.id - b.id);
     const boardPoints = discs.reduce((s, d) => s + d.points, 0);
     const twenties = state.twenties[team];
-    tallies.push({ team, discs, boardPoints, twenties, total: boardPoints + 20 * twenties, awarded: 0 });
+    const penalties = state.penalties?.[team] ?? 0;
+    tallies.push({ team, discs, boardPoints, twenties, penalties, total: boardPoints + 20 * twenties - PENALTY_POINTS * penalties, awarded: 0 });
   }
   if (state.teamCount === 2) {
     const [a, b] = tallies;

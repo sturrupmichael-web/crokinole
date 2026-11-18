@@ -65,6 +65,19 @@ export const PEGS: ReadonlyArray<{ x: number; y: number }> = Array.from({ length
   return { x: BOARD.r15 * Math.cos(a), y: BOARD.r15 * Math.sin(a) };
 });
 
+/**
+ * 5-hole board: four extra −10 holes, centred in the 10 zone on the quadrant
+ * lines (45° + k·90°), between the pegs. Same size as the 20 hole.
+ */
+export const PENALTY_HOLE_R = 6;
+export const PENALTY_POINTS = 10;
+export const PENALTY_HOLES: ReadonlyArray<{ x: number; y: number }> = Array.from({ length: 4 }, (_, i) => {
+  const a = Math.PI / 4 + (i * Math.PI) / 2;
+  return { x: PENALTY_HOLE_R * Math.cos(a), y: PENALTY_HOLE_R * Math.sin(a) };
+});
+
+export type BoardKind = 'classic' | 'five-hole';
+
 /** Angular half-width of a seat's arc of the shooting line, keeping the disc inside its quadrant lines. */
 export const ARC_HALF = Math.PI / 4 - BOARD.discR / BOARD.r5;
 

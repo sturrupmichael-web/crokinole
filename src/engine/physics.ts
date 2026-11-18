@@ -24,7 +24,8 @@ export type SimEvent =
   | { t: number; kind: 'disc'; a: number; b: number; speed: number }
   | { t: number; kind: 'peg'; id: number; peg: number; speed: number }
   | { t: number; kind: 'ditch'; id: number }
-  | { t: number; kind: 'twenty'; id: number };
+  | { t: number; kind: 'twenty'; id: number }
+  | { t: number; kind: 'penalty'; id: number; hole: number };
 
 export class Sim {
   /** Discs still on the playing surface. */
@@ -33,14 +34,19 @@ export class Sim {
   readonly ditched: SimDisc[] = [];
   /** Discs that dropped in the 20 hole, in order. */
   readonly twenties: SimDisc[] = [];
+  /** Discs that dropped in a −10 hole (5-hole board), in order. */
+  readonly penalties: SimDisc[] = [];
+  /** Extra (−10) hole centres; empty on a classic board. */
+  readonly holes: ReadonlyArray<{ x: number; y: number }>;
   readonly events: SimEvent[] = [];
   /** Ticks simulated so far. */
   ticks = 0;
   /** Called for every disc–disc contact (used by the rules to track the shot's chain of hits). */
   onContact: ((a: SimDisc, b: SimDisc) => void) | null = null;
 
-  constructor(discs: SimDisc[]) {
+  constructor(discs: SimDisc[], holes: ReadonlyArray<{ x: number; y: number }> = []) {
     this.discs = discs.map((d) => ({ ...d }));
+    this.holes = holes;
   }
 
   get time(): number {
@@ -163,10 +169,25 @@ export class Sim {
         this.twenties.push(d);
         this.events.push({ t: this.time, kind: 'twenty', id: d.id });
       } else {
-        keep.push(d);
+        const hole = this.penaltyHoleAt(d, capR2);
+        if (hole >= 0) {
+          d.vx = d.vy = 0;
+          this.penalties.push(d);
+          this.events.push({ t: this.time, kind: 'penalty', id: d.id, hole });
+        } else keep.push(d);
       }
     }
     if (keep.length !== this.discs.length) this.discs = keep;
+  }
+
+  /** Index of the −10 hole this disc drops into now, or −1. Same capture rule as the 20 hole. */
+  private penaltyHoleAt(d: SimDisc, capR2: number): number {
+    for (let i = 0; i < this.holes.length; i++) {
+      const dx = d.x - this.holes[i].x;
+      const dy = d.y - this.holes[i].y;
+      if (dx * dx + dy * dy <= capR2 && Math.hypot(d.vx, d.vy) <= PHYSICS.holeMaxSpeed) return i;
+    }
+    return -1;
   }
 
   /** Constant deceleration: speed drops by friction·dt each tick, never reversing. */

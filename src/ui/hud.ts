@@ -13,6 +13,8 @@ const AWARD_ICONS: Record<string, string> = {
   'Biggest takeout': '🧨',
   'Pinball wizard': '📍',
   'Foul magnet': '🙈',
+  Sinker: '🕳️',
+  Butterfingers: '🧈',
 };
 
 /** End-of-game awards as HTML (shared by the TV, local mode and phones). */
@@ -86,7 +88,7 @@ export class Hud {
         )}</span><b>${s}</b></div>`;
       })
       .join('');
-    this.score.innerHTML = `${rows}<div class="meta">Round ${state.round} · to ${state.settings.target}</div>`;
+    this.score.innerHTML = `${rows}<div class="meta">Round ${state.round} · to ${state.settings.target}${state.settings.board === 'five-hole' ? ' · 5-hole' : ''}</div>`;
   }
 
   setBanner(html: string, team: number | null = null): void {
@@ -111,7 +113,8 @@ export class Hud {
     this.tallyBox.classList.remove('hidden');
     const rows = p.result.tallies
       .map((t) => {
-        const tw = t.twenties ? ` <small>(${t.twenties}× 20)</small>` : '';
+        const extras = [t.twenties ? `${t.twenties}× 20` : '', t.penalties ? `${t.penalties}× −10` : ''].filter(Boolean).join(', ');
+        const tw = extras ? ` <small>(${extras})</small>` : '';
         return `<div class="trow"><span class="dot" style="background:${TEAM_COLORS[t.team]}"></span><span class="tname">${esc(
           teamLabel(state, names, t.team),
         )}${tw}</span><b>${p.shown[t.team]}</b></div>`;

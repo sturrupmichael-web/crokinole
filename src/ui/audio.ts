@@ -48,6 +48,7 @@ export class Sfx {
     if (e.kind === 'disc') this.clack(Math.min(1, e.speed / 40));
     else if (e.kind === 'peg') this.ping(Math.min(1, e.speed / 35));
     else if (e.kind === 'twenty') this.drop();
+    else if (e.kind === 'penalty') this.sink();
     else if (e.kind === 'ditch') this.thud();
   }
 
@@ -109,6 +110,24 @@ export class Sfx {
     o.stop(t + 0.32);
     setTimeout(() => this.tone(ctx, 95, 0.18, 0.6, 'sine'), 260);
     setTimeout(() => this.chime(), 380);
+  }
+
+  /** A disc drops into a −10 hole: a hollow drop and a sad slide down. */
+  sink(): void {
+    const ctx = this.ready('sink', 100);
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(420, t);
+    o.frequency.exponentialRampToValueAtTime(90, t + 0.45);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.45, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    o.connect(g).connect(this.master!);
+    o.start(t);
+    o.stop(t + 0.52);
+    setTimeout(() => this.tone(ctx, 80, 0.2, 0.55, 'sine'), 300);
   }
 
   thud(): void {

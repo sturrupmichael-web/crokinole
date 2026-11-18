@@ -52,6 +52,9 @@ export class BoardView {
   private g: CanvasRenderingContext2D;
   private art: HTMLCanvasElement | null = null;
   private artScale = 0;
+  private artFive = false;
+  /** Draw the 5-hole board's −10 holes. */
+  fiveHole = false;
   scale = 10;
   cx = 0;
   cy = 0;
@@ -66,6 +69,13 @@ export class BoardView {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d')!;
+  }
+
+  /** Switch between the classic and 5-hole board art. */
+  setFiveHole(on: boolean): void {
+    if (on === this.fiveHole) return;
+    this.fiveHole = on;
+    this.resize();
   }
 
   /** Put `seat` at the bottom of the view. */
@@ -89,9 +99,10 @@ export class BoardView {
     this.cx = w / 2;
     this.cy = h / 2 + this.fit.offsetY * this.scale;
     const want = this.scale * this.dpr;
-    if (!this.art || Math.abs(want - this.artScale) > 0.01) {
-      this.art = renderBoardArt(want);
+    if (!this.art || Math.abs(want - this.artScale) > 0.01 || this.artFive !== this.fiveHole) {
+      this.art = renderBoardArt(want, this.fiveHole);
       this.artScale = want;
+      this.artFive = this.fiveHole;
     }
   }
 

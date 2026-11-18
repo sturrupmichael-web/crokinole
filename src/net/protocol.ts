@@ -11,7 +11,7 @@
  * the new state. Phones only re-run the physics of a shot for display while it
  * moves (it's deterministic, so it matches the TV); the host's state always wins.
  */
-import type { Seat } from '../engine/board';
+import type { BoardKind, Seat } from '../engine/board';
 import type { GameState, Shot } from '../engine/rules';
 
 export const ROOM_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O
@@ -66,6 +66,8 @@ export interface RoomState {
   /** Seat number → index into players (playing phase). */
   seatPlayer: Array<number | null>;
   target: 50 | 100;
+  /** Board for the next game. Missing in older saves = classic. */
+  board?: BoardKind;
   game: GameState | null;
   /** Discs are moving: phones show "watch the screen". */
   moving: boolean;

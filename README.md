@@ -80,6 +80,20 @@ rounds, the tally and the end screen.
 Stats live in `GameState.stats` (per seat) and `GameState.highlight` (this round's best shot), so
 they survive a host refresh. See `src/engine/highlights.ts`.
 
+## 5-hole board
+
+An optional board (pick "5-hole (−10s)" in the local menu or the party lobby) adds four
+penalty holes to the classic board:
+
+- One on each quadrant line, centred 6 in from the middle (inside the 10 zone, just outside the
+  pegs), the same size as the 20 hole and with the same capture rule (slow enough and centred enough).
+- A disc that drops in costs its **owner** 10 points that round, even on a foul shot, so knocking an
+  opponent in is a real play. A team's round total can go negative.
+- The tally shows them as "2× −10"; two new awards: *Sinker* (knocked the most opponents in) and
+  *Butterfingers* (dropped your own).
+- The computer opponent scores every candidate shot with the same tally, so it avoids the holes and
+  goes for knock-ins.
+
 ## Rules as implemented
 
 - **Seats and discs.** 2 players sit opposite with 12 discs each. 3 players play
