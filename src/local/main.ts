@@ -184,8 +184,6 @@ function startLocal(prefs: Prefs): void {
     sfx.setEnabled(!sfx.enabled);
     soundBtn.textContent = sfx.enabled ? '🔊' : '🔇';
   });
-  const meter = el('div', 'meter local-meter hidden', '<div class="fill"></div><span></span>');
-  stage.append(meter);
   // Tap the board to skip a replay.
   canvas.addEventListener('pointerdown', () => table?.skipReplay());
   const exitBtn = el('button', 'iconbtn', '✕');
@@ -236,18 +234,10 @@ function startLocal(prefs: Prefs): void {
   if (autoplay) table.speed = 6;
   (window as unknown as { __table: Table }).__table = table;
   const aim = new AimInput(view, {
-    onPreview: (shot, pulling) => {
+    onPreview: (shot) => {
       preview = { shot, team: table.state.teamOfSeat[shot.seat] };
-      meter.classList.toggle('hidden', !pulling);
-      if (pulling) {
-        const fill = meter.firstElementChild as HTMLElement;
-        fill.style.width = `${Math.round(shot.power * 100)}%`;
-        fill.style.background = `hsl(${120 - 120 * shot.power}, 80%, 50%)`;
-        meter.querySelector('span')!.textContent = `Power ${Math.round(shot.power * 100)}%`;
-      }
     },
     onShoot: (shot) => {
-      meter.classList.add('hidden');
       sfx.unlock();
       preview = null;
       aim.enable(null);

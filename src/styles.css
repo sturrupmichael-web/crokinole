@@ -127,9 +127,6 @@ button { font: inherit; }
 .phone-status .go { color: var(--accent); font-size: 26px; }
 .phone-status .req { color: var(--accent); font-weight: 700; }
 .phone-status .news { color: #ffb35b; font-weight: 800; font-size: 18px; }
-.meter { position: absolute; left: 16px; right: 16px; bottom: calc(110px + env(safe-area-inset-bottom)); height: 26px; border-radius: 13px; background: rgba(0,0,0,0.55); border: 1px solid var(--line); overflow: hidden; pointer-events: none; }
-.meter .fill { height: 100%; width: 0; }
-.meter span { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 14px; text-shadow: 0 1px 2px #000; }
 .phone-overlay { position: absolute; left: 12px; right: 12px; top: 64px; max-height: calc(100% - 180px); overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .phone-overlay h2 { margin: 4px 0 8px; }
 .plist { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; font-size: 17px; }
@@ -148,4 +145,3 @@ button { font: inherit; }
 .awards small { color: var(--muted); }
 @keyframes award-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
 
-.local-meter { left: 50%; right: auto; width: min(320px, calc(100vw - 32px)); transform: translateX(-50%); bottom: 60px; }

@@ -107,9 +107,8 @@ function play(room: string, myName: string): void {
   const canvas = el('canvas');
   stageBox.append(canvas);
   const status = el('div', 'phone-status');
-  const meter = el('div', 'meter hidden', '<div class="fill"></div><span></span>');
   const overlay = el('div', 'phone-overlay hidden');
-  root.append(top, stageBox, status, meter, overlay);
+  root.append(top, stageBox, status, overlay);
   app.append(root);
 
   const view = new BoardView(canvas);
@@ -123,9 +122,8 @@ function play(room: string, myName: string): void {
   let errText = '';
 
   const aim = new AimInput(view, {
-    onPreview: (shot, pulling) => {
+    onPreview: (shot) => {
       preview = shot;
-      setMeter(pulling ? shot.power : null);
       const now = performance.now();
       if (now - lastAimSent > 110) {
         lastAimSent = now;
@@ -143,18 +141,9 @@ function play(room: string, myName: string): void {
       }
       aim.enable(null);
       preview = null;
-      setMeter(null);
       render();
     },
   });
-
-  function setMeter(power: number | null): void {
-    meter.classList.toggle('hidden', power == null);
-    if (power == null) return;
-    (meter.firstElementChild as HTMLElement).style.width = `${Math.round(power * 100)}%`;
-    (meter.firstElementChild as HTMLElement).style.background = `hsl(${120 - 120 * power}, 80%, 50%)`;
-    meter.querySelector('span')!.textContent = `Power ${Math.round(power * 100)}%`;
-  }
 
   function myTurn(): boolean {
     const g = rs?.game;
