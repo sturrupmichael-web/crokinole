@@ -61,11 +61,37 @@ export interface Frame {
   aim?: { shot: Shot; team: number; solid?: boolean } | null;
   /** Discs in hand per seat, drawn as little stacks by the rail. */
   stacks?: { seat: Seat; team: number; count: number }[];
+  /** 20s holders (one per team, on its first seat's rail) and how many 20s are in each this round. */
+  holders?: Holder[];
   labels?: { seat: Seat; text: string; team: number; dim?: boolean }[];
   /** Draw the slow-motion replay frame (vignette + REPLAY badge). */
   replaying?: boolean;
   /** Board state used to place the aim ghost (launch slides along the arc around discs). */
   state?: GameState;
+}
+
+export interface Holder {
+  seat: Seat;
+  team: number;
+  count: number;
+}
+
+/** Where a team's 20s holder sits: on the rail, to the seat's left (the disc stack is on the right). */
+export const HOLDER_ALONG = -0.36;
+export const HOLDER_OUT = BOARD.railR + 0.8;
+
+/**
+ * One 20s holder per team with this round's 20s. `moving` adds discs that
+ * have dropped in during a shot still in motion (a foul can still void them).
+ */
+export function twentyHolders(s: GameState, moving: ReadonlyArray<{ team: number }> = []): Holder[] {
+  const out: Holder[] = [];
+  for (let team = 0; team < s.teamCount; team++) {
+    const seat = s.seats.find((x) => s.teamOfSeat[x] === team);
+    if (seat == null) continue;
+    out.push({ seat, team, count: (s.twenties[team] ?? 0) + moving.filter((d) => d.team === team).length });
+  }
+  return out;
 }
 
 export class BoardView {
@@ -219,6 +245,7 @@ export class BoardView {
 
     if (frame.activeSeat != null) this.drawArc(frame.activeSeat);
     if (frame.stacks) for (const st of frame.stacks) this.drawStack(st.seat, st.team, st.count);
+    if (frame.holders) for (const h of frame.holders) this.drawHolder(h);
     if (frame.labels) for (const l of frame.labels) this.drawLabel(l.seat, l.text, l.team, l.dim);
 
     for (const d of frame.discs) this.drawDisc(d);
@@ -239,6 +266,10 @@ export class BoardView {
         }
       }
     }
+    for (const h of frame.holders ?? []) {
+      const p = this.seatAnchor(h.seat, HOLDER_ALONG, HOLDER_OUT);
+      for (let k = 0; k < Math.min(h.count, 9); k++) discs.push({ id: -3, team: h.team, x: p.x, y: p.y, scale: 0.9, level: k });
+    }
     let aimLine: (() => void) | null = null;
     if (frame.aim) {
       const { shot, team, solid } = frame.aim;
@@ -248,8 +279,13 @@ export class BoardView {
     }
     // Pixels per inch at the centre, for overlay sizes.
     this.scale = s3.centerScale;
-    s3.render(discs, this.rot, this.fiveHole, frame.activeSeat ?? null);
+    s3.render(discs, this.rot, this.fiveHole, frame.activeSeat ?? null, frame.holders ?? []);
     if (frame.labels) for (const l of frame.labels) this.drawLabel(l.seat, l.text, l.team, l.dim);
+    for (const h of frame.holders ?? []) {
+      const p = this.seatAnchor(h.seat, HOLDER_ALONG, HOLDER_OUT);
+      const [x, y] = s3.project(p.x, p.y, s3.holderTop);
+      if (h.count > 0) this.drawCount(x, y - Math.max(12, 0.8 * this.scale), h.count, h.team);
+    }
     aimLine?.();
     this.drawFloaters();
     if (frame.replaying) this.drawReplayFrame();
@@ -395,6 +431,63 @@ export class BoardView {
       const p = this.seatAnchor(seat, 0.42 + i * 0.062, BOARD.railR + 0.95);
       this.drawDisc({ id: -2, team, x: p.x, y: p.y, scale: 0.72 });
     }
+  }
+
+  /** Top-down 20s holder: a brass-rimmed tube seen from above, the top 20 inside, the count beside it. */
+  private drawHolder(h: Holder): void {
+    const g = this.g;
+    const p = this.seatAnchor(h.seat, HOLDER_ALONG, HOLDER_OUT);
+    const [x, y] = this.toScreen(p.x, p.y);
+    const r = BOARD.discR * 1.22 * this.scale;
+    g.save();
+    g.fillStyle = 'rgba(0,0,0,0.4)';
+    g.beginPath();
+    g.arc(x + r * 0.1, y + r * 0.16, r, 0, Math.PI * 2);
+    g.fill();
+    const rim = g.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+    rim.addColorStop(0, '#fff2cf');
+    rim.addColorStop(0.55, '#d6ad62');
+    rim.addColorStop(1, '#6e4a1b');
+    g.fillStyle = rim;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#1a0f07';
+    g.beginPath();
+    g.arc(x, y, r * 0.8, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+    if (h.count > 0) {
+      this.drawDisc({ id: -3, team: h.team, x: p.x, y: p.y, scale: 0.86 });
+      // The count sits on the board side of the holder.
+      const a = seatAngle(h.seat) + HOLDER_ALONG;
+      const tx = -Math.sin(a);
+      const ty = Math.cos(a);
+      const [bx, by] = this.toScreen(p.x + tx * 1.75, p.y + ty * 1.75);
+      this.drawCount(bx, by, h.count, h.team);
+    }
+  }
+
+  /** Small gold pill with a number in it. */
+  private drawCount(x: number, y: number, n: number, team: number): void {
+    const g = this.g;
+    const size = Math.max(13, 0.85 * this.scale);
+    const text = `${n}`;
+    g.save();
+    g.font = `900 ${size}px system-ui, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const h = size * 1.45;
+    const w = Math.max(h, g.measureText(text).width + size * 0.9);
+    g.fillStyle = '#ffd866';
+    g.strokeStyle = TEAM_COLORS[team] ?? '#888';
+    g.lineWidth = Math.max(2, size * 0.14);
+    roundRect(g, x - w / 2, y - h / 2, w, h, h / 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#2a1606';
+    g.fillText(text, x, y + 1);
+    g.restore();
   }
 
   private drawLabel(seat: Seat, text: string, team: number, dim = false): void {

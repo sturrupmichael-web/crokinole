@@ -90,6 +90,11 @@ The **3D / Top** button (top right on the computer and TV, on the board on phone
   the TV turns to whoever is shooting. Aiming works the same way: the press and pull are traced onto
   the board plane, so the slingshot behaves exactly as in top-down.
 
+Each side has a **20s holder** on its rail (to the left of the seat; the disc stack is on the right).
+Discs that drop in the 20 this round collect there: top-down shows the top disc with a count beside
+it once there's at least one, and 3D shows them stacked in a clear tube with the count above. A 20
+voided by a foul comes back out, and the holders empty for the next round.
+
 The choice is remembered per device. The 3D renderer (`src/render/scene3d.ts`) is loaded only when
 someone picks it; the physics and rules don't know it exists. If WebGL isn't available it falls back to
 top-down.

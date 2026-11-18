@@ -19,7 +19,7 @@ import {
 } from '../engine/rules';
 import { type Highlight, replayState } from '../engine/highlights';
 import type { Sfx } from '../ui/audio';
-import { type BoardView, type DrawDisc, type Frame, TEAM_COLORS } from '../render/view';
+import { type BoardView, type DrawDisc, type Frame, TEAM_COLORS, twentyHolders } from '../render/view';
 
 interface Fx {
   disc: DrawDisc;
@@ -303,6 +303,7 @@ export class Table {
         activeSeat: r.intro > 0 ? r.highlight.seat : null,
         aim: r.intro > 0 ? { shot: { ...r.highlight.shot, power: r.highlight.shot.power * Math.min(1, (1.1 - r.intro) / 0.8) }, team: s.teamOfSeat[r.highlight.seat], solid: true } : null,
         stacks: s.seats.map((seat) => ({ seat, team: s.teamOfSeat[seat], count: b.discsLeft[seat] - (seat === r.highlight.seat ? 1 : 0) })),
+        holders: twentyHolders(replayState(s, r.highlight), r.live.sim.twenties),
         replaying: true,
       };
     }
@@ -330,6 +331,7 @@ export class Table {
       state: s,
       activeSeat: !this.live && s.phase === 'shooting' ? currentSeat(s) : null,
       stacks: s.seats.map((seat) => ({ seat, team: s.teamOfSeat[seat], count: s.discsLeft[seat] - (this.live?.shot.seat === seat ? 1 : 0) })),
+      holders: twentyHolders(s, this.live?.sim.twenties),
       ...extra,
     };
   }

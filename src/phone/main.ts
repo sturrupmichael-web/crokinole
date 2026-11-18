@@ -8,7 +8,7 @@ import '../styles.css';
 import type { Seat } from '../engine/board';
 import { type LiveShot, type Shot, beginShot, currentSeat, requirement } from '../engine/rules';
 import { PHYSICS } from '../engine/board';
-import { BoardView, TEAM_COLORS } from '../render/view';
+import { BoardView, TEAM_COLORS, twentyHolders } from '../render/view';
 import { AimInput } from '../ui/aim';
 import { REQ_TEXT, awardsHtml, cameraButton, el, esc, shownScores, teamLabel, verb } from '../ui/hud';
 import { type PhoneMsg, type RoomState, cleanName, isRoomCode, normalizeRoomCode, pidKey, seatOfKey } from '../net/protocol';
@@ -317,6 +317,7 @@ function play(room: string, myName: string): void {
           state: g,
           activeSeat: g.phase === 'shooting' && !rs!.moving ? currentSeat(g) : null,
           aim: preview && myTurn() ? { shot: preview, team: g.teamOfSeat[mySeat!] } : null,
+          holders: twentyHolders(g, live?.sim.twenties),
           stacks: mySeat != null ? [{ seat: mySeat, team: g.teamOfSeat[mySeat], count: g.discsLeft[mySeat] - (live?.shot.seat === mySeat ? 1 : 0) }] : [],
         },
         dt,

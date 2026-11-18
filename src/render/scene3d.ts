@@ -9,13 +9,16 @@
 import * as THREE from 'three';
 import { BOARD, PEGS, PENALTY_HOLES, seatAngle, type Seat } from '../engine/board';
 import { renderBoardArt } from './art';
-import { TEAM_COLORS, shade, type DrawDisc } from './view';
+import { HOLDER_ALONG, HOLDER_OUT, TEAM_COLORS, shade, type DrawDisc, type Holder } from './view';
 
 const DISC_T = 0.38;
 const DITCH_D = 0.45;
 const RAIL_H = 0.9;
 const TABLE_Y = -1.6;
 const PEG_H = 0.55;
+/** 20s holder: a clear tube on a walnut foot, standing against the rail. */
+const HOLDER_H = 3.6;
+const HOLDER_R = BOARD.discR * 1.12;
 const ART_PX = 44;
 /** Camera elevation above the board plane, seen from the board centre (higher on tall screens, which have room to spare). */
 const ELEVATION_WIDE = (37 * Math.PI) / 180;
@@ -25,6 +28,8 @@ const FOV = 38;
 export interface Disc3D extends DrawDisc {
   /** Ghost/aim disc: glowing, see-through. */
   ghost?: boolean;
+  /** Stacked in a 20s holder: 0 is the bottom disc. */
+  level?: number;
 }
 
 function baseY(r: number): number {
@@ -101,6 +106,9 @@ export class Scene3D {
   private h = 1;
   /** Pixels per inch at the board centre (for overlay text sizes). */
   centerScale = 10;
+  private tubes: THREE.Group[] = [];
+  /** Height of the top of a 20s holder tube (for the count above it). */
+  readonly holderTop = TABLE_Y + HOLDER_H + 0.3;
   private ray = new THREE.Raycaster();
   private plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
@@ -250,6 +258,12 @@ export class Scene3D {
       // The disc stacks just outside the rail on the table.
       pts.push(new THREE.Vector3((BOARD.railR + 1.4) * Math.cos(a), TABLE_Y + DISC_T, -(BOARD.railR + 1.4) * Math.sin(a)));
     }
+    // Tops of the 20s holders (and the count above them) only need to clear the top edge.
+    const tops: THREE.Vector3[] = [];
+    for (let i = 0; i < 32; i++) {
+      const a = (i / 32) * Math.PI * 2;
+      tops.push(new THREE.Vector3(HOLDER_OUT * Math.cos(a), this.holderTop + 1.3, -HOLDER_OUT * Math.sin(a)));
+    }
     const v = new THREE.Vector3();
     const fits = (d: number, k: number) => {
       this.place(0, d, k);
@@ -258,6 +272,10 @@ export class Scene3D {
         // Rail must fit; the disc stacks only need to clear the bottom.
         const side = i % 2 === 0 ? 0.985 : 9;
         if (v.z > 1 || v.x < -side || v.x > side || v.y > top || v.y < bottom) return false;
+      }
+      for (const p of tops) {
+        v.copy(p).project(this.camera);
+        if (v.y > 0.97) return false;
       }
       return true;
     };
@@ -330,7 +348,42 @@ export class Scene3D {
     return this.pool[i];
   }
 
-  render(discs: Disc3D[], rot: number, five: boolean, activeSeat: Seat | null): void {
+  private tube(i: number): THREE.Group {
+    while (this.tubes.length <= i) {
+      const g = new THREE.Group();
+      const glass = new THREE.Mesh(
+        new THREE.CylinderGeometry(HOLDER_R, HOLDER_R, HOLDER_H, 40, 1, true),
+        new THREE.MeshStandardMaterial({ color: 0xdfeeff, transparent: true, opacity: 0.22, roughness: 0.08, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      glass.position.y = HOLDER_H / 2 + 0.25;
+      const brass = new THREE.MeshStandardMaterial({ color: 0xd9b26a, metalness: 0.65, roughness: 0.3 });
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(HOLDER_R, 0.06, 10, 40), brass);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = HOLDER_H + 0.25;
+      const foot = new THREE.Mesh(
+        new THREE.CylinderGeometry(HOLDER_R * 1.25, HOLDER_R * 1.35, 0.25, 40),
+        new THREE.MeshStandardMaterial({ color: 0x4a2a14, roughness: 0.55 }),
+      );
+      foot.position.y = 0.125;
+      foot.castShadow = foot.receiveShadow = true;
+      g.add(foot, glass, rim);
+      g.position.y = TABLE_Y;
+      this.scene.add(g);
+      this.tubes.push(g);
+    }
+    return this.tubes[i];
+  }
+
+  render(discs: Disc3D[], rot: number, five: boolean, activeSeat: Seat | null, holders: Holder[] = []): void {
+    holders.forEach((h, i) => {
+      const a = seatAngle(h.seat) + HOLDER_ALONG;
+      const t = this.tube(i);
+      t.position.x = HOLDER_OUT * Math.cos(a);
+      t.position.z = -HOLDER_OUT * Math.sin(a);
+      t.visible = true;
+    });
+    for (let i = holders.length; i < this.tubes.length; i++) this.tubes[i].visible = false;
+
     if (this.artFive !== five) this.buildBoard(five);
     this.place(rot);
 
@@ -355,7 +408,7 @@ export class Scene3D {
       }
       const s = d.scale ?? 1;
       const r = Math.hypot(d.x, d.y);
-      let y = baseY(r) + DISC_T / 2;
+      let y = d.level != null ? TABLE_Y + 0.25 + DISC_T * (d.level + 0.5) : baseY(r) + DISC_T / 2;
       // Falling into a hole: sink as it shrinks.
       if (s < 1 && r < BOARD.surfaceR) y -= (1 - s) * 1.2;
       p.mesh.position.set(d.x, y, -d.y);
