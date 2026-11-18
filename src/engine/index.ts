@@ -4,3 +4,4 @@ export * from './physics';
 export * from './rules';
 export * from './ai';
 export * from './rng';
+export * from './highlights';

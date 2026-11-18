@@ -13,6 +13,7 @@
  */
 import { ARC_HALF, BOARD, FULL_POWER_SPEED, PHYSICS, type Seat, arcPoint, clamp, onOrBeyondShootingLine, reaches15, seatAngle, zoneScore } from './board';
 import { Sim, type SimDisc, type SimEvent } from './physics';
+import { type Highlight, type SeatStats, emptyStats, recordShot } from './highlights';
 
 export type PlayerCount = 2 | 3 | 4;
 
@@ -81,6 +82,10 @@ export interface GameState {
   nextId: number;
   phase: 'shooting' | 'round-over' | 'game-over';
   lastRound: RoundResult | null;
+  /** Per-seat stats for the whole game (indexed by seat number). Missing in games saved before stats existed. */
+  stats?: SeatStats[];
+  /** The best shot of the current round, for the replay (null until a shot qualifies). */
+  highlight?: Highlight | null;
   /** Winning team once phase is 'game-over'. */
   winner: number | null;
 }
@@ -109,6 +114,8 @@ export function createGame(settings: Settings): GameState {
     nextId: 1,
     phase: 'round-over',
     lastRound: null,
+    stats: emptyStats(),
+    highlight: null,
     winner: null,
   };
   return startRound(state, 0);
@@ -126,6 +133,7 @@ function startRound(prev: GameState, starter: number): GameState {
     board: [],
     twenties: new Array(prev.teamCount).fill(0),
     phase: 'shooting',
+    highlight: null,
   };
 }
 
@@ -275,16 +283,6 @@ export function finishShot(state: GameState, live: LiveShot): { state: GameState
   const discsLeft = state.discsLeft.slice() as GameState['discsLeft'];
   discsLeft[live.shot.seat]--;
 
-  let next: GameState = {
-    ...state,
-    board,
-    twenties: newTwenties,
-    discsLeft,
-    nextId: state.nextId + 1,
-    turn: (state.turn + 1) % state.seats.length,
-  };
-  if (state.seats.every((s) => discsLeft[s] === 0)) next = endRound(next);
-
   const outcome: ShotOutcome = {
     shot: live.shot,
     shotId,
@@ -299,6 +297,20 @@ export function finishShot(state: GameState, live: LiveShot): { state: GameState
     events: sim.events,
     duration: sim.time,
   };
+  const { stats, highlight } = recordShot(state, outcome);
+
+  let next: GameState = {
+    ...state,
+    stats,
+    highlight,
+    board,
+    twenties: newTwenties,
+    discsLeft,
+    nextId: state.nextId + 1,
+    turn: (state.turn + 1) % state.seats.length,
+  };
+  if (state.seats.every((s) => discsLeft[s] === 0)) next = endRound(next);
+
   return { state: next, outcome };
 }
 

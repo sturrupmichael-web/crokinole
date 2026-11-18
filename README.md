@@ -62,6 +62,24 @@ npm run build      # type-check + static build into dist/
 `/crokinole/?autoplay` makes every seat a computer player at 6× speed, which is handy for checking
 rounds, the tally and the end screen.
 
+## Replays and awards
+
+- **Shot of the round.** Every shot is scored for drama: 20s, takeouts (opponent discs knocked
+  into the ditch or past the shooting line), bonus for doubles and for a takeout plus a 20, a little
+  for peg hits and clacks. Fouls score nothing. At the end of a round the best shot (if it scored
+  at least `REPLAY_THRESHOLD`) is replayed in slow motion before the tally. The physics is
+  deterministic, so the replay re-runs the real shot from the saved state before it. Tap, Space,
+  Enter or Esc skips it.
+- **Awards.** At game end: Sharpshooter (most 20s), Demolition crew (most takeouts), Biggest
+  takeout (2+ discs in one shot), Pinball wizard (3+ peg hits in one shot), Foul magnet (2+ fouls).
+  An award only appears if someone earned it, and ties share it. Shown on the TV, in local mode and
+  on every phone.
+- **No spoilers.** Scoreboards (TV and phones) keep the previous scores until the tally finishes,
+  and phones show the winner only once the TV does.
+
+Stats live in `GameState.stats` (per seat) and `GameState.highlight` (this round's best shot), so
+they survive a host refresh. See `src/engine/highlights.ts`.
+
 ## Rules as implemented
 
 - **Seats and discs.** 2 players sit opposite with 12 discs each. 3 players play

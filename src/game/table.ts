@@ -17,6 +17,7 @@ import {
   finishShot,
   nextRound,
 } from '../engine/rules';
+import { type Highlight, replayState } from '../engine/highlights';
 import type { Sfx } from '../ui/audio';
 import { type BoardView, type DrawDisc, type Frame, TEAM_COLORS } from '../render/view';
 
@@ -34,7 +35,24 @@ export interface TallyProgress {
   done: boolean;
 }
 
+/** Slow-motion replay of the round's best shot, shown before the tally. */
+export interface ReplayView {
+  highlight: Highlight;
+  live: LiveShot;
+  /** Seconds left showing the aim before the disc goes. */
+  intro: number;
+  /** Seconds to hold after everything stops. */
+  outro: number;
+  acc: number;
+  seen: number;
+}
+
+/** Replay speed (fraction of real time). */
+const REPLAY_SPEED = 0.4;
+
 export interface TableHooks {
+  /** Replay started (highlight) or ended (null). */
+  onReplay?(h: Highlight | null): void;
   onShotEnd?(outcome: ShotOutcome, state: GameState): void;
   onTally?(p: TallyProgress): void;
   onChange?(state: GameState): void;
@@ -44,6 +62,7 @@ export class Table {
   state: GameState;
   live: LiveShot | null = null;
   tally: TallyProgress | null = null;
+  replay: ReplayView | null = null;
   /** Playback speed multiplier for shots (1 = real time). */
   speed = 1;
   private acc = 0;
@@ -62,12 +81,17 @@ export class Table {
     this.state = state;
   }
 
+  /** The round has ended but its tally hasn't finished, so scores shouldn't show its points yet. */
+  get scoresPending(): boolean {
+    return this.state.phase !== 'shooting' && !this.tally?.done;
+  }
+
   get moving(): boolean {
     return this.live !== null;
   }
 
   canShoot(seat: Seat): boolean {
-    return !this.live && !this.tally && this.state.phase === 'shooting' && currentSeat(this.state) === seat;
+    return !this.live && !this.tally && !this.replay && this.state.phase === 'shooting' && currentSeat(this.state) === seat;
   }
 
   shoot(shot: Shot): boolean {
@@ -84,11 +108,13 @@ export class Table {
     this.state = state;
     this.live = null;
     this.tally = null;
+    this.replay = null;
     this.fx = [];
   }
 
   update(dt: number): void {
     if (this.live) this.stepShot(dt);
+    if (this.replay) this.stepReplay(dt);
     if (this.tally && !this.tally.done) {
       this.tallyClock -= dt;
       while (this.tallyClock <= 0 && this.tallyQueue.length) {
@@ -107,11 +133,19 @@ export class Table {
     const sim = live.sim;
     this.acc += Math.min(dt, 0.1) * this.speed;
     while (this.acc >= PHYSICS.dt && sim.isMoving()) {
-      const before = new Map<number, SimDisc>(sim.discs.map((d) => [d.id, { ...d }]));
-      sim.step();
       this.acc -= PHYSICS.dt;
-      for (; this.seenEvents < sim.events.length; this.seenEvents++) {
-        const e = sim.events[this.seenEvents];
+      this.seenEvents = this.tick(live, this.seenEvents);
+    }
+    if (!sim.isMoving()) this.finish();
+  }
+
+  /** One fixed physics tick plus its sounds and drop effects. Returns the new seen-events count. */
+  private tick(live: LiveShot, seen: number): number {
+    const sim = live.sim;
+    const before = new Map<number, SimDisc>(sim.discs.map((d) => [d.id, { ...d }]));
+    sim.step();
+    for (; seen < sim.events.length; seen++) {
+        const e = sim.events[seen];
         this.sfx.event(e);
         if (e.kind === 'ditch' || e.kind === 'twenty') {
           const d = sim.ditched.find((x) => x.id === e.id) ?? sim.twenties.find((x) => x.id === e.id) ?? before.get(e.id);
@@ -125,9 +159,44 @@ export class Table {
           }
           if (e.kind === 'twenty') this.view.float(0, 1.2, '20!', '#ffe27a', 2.2, 1.8);
         }
-      }
     }
-    if (!sim.isMoving()) this.finish();
+    return seen;
+  }
+
+  private startReplay(h: Highlight): void {
+    const live = beginShot(replayState(this.state, h), h.shot);
+    this.replay = { highlight: h, live, intro: 1.1, outro: 1.4, acc: 0, seen: 0 };
+    this.fx = [];
+    this.hooks.onReplay?.(h);
+    this.hooks.onChange?.(this.state);
+  }
+
+  private stepReplay(dt: number): void {
+    const r = this.replay!;
+    dt = Math.min(dt, 0.1);
+    if (r.intro > 0) {
+      r.intro -= dt;
+      return;
+    }
+    if (r.live.sim.isMoving()) {
+      r.acc += dt * REPLAY_SPEED * this.speed;
+      while (r.acc >= PHYSICS.dt && r.live.sim.isMoving()) {
+        r.acc -= PHYSICS.dt;
+        r.seen = this.tick(r.live, r.seen);
+      }
+      return;
+    }
+    r.outro -= dt * this.speed;
+    if (r.outro <= 0) this.skipReplay();
+  }
+
+  /** End the replay now (tap to skip) and go on to the tally. */
+  skipReplay(): void {
+    if (!this.replay) return;
+    this.replay = null;
+    this.fx = [];
+    this.hooks.onReplay?.(null);
+    if (this.state.lastRound) this.startTally(this.state.lastRound);
   }
 
   private finish(): void {
@@ -154,7 +223,14 @@ export class Table {
     this.state = state;
     this.hooks.onShotEnd?.(outcome, state);
     this.hooks.onChange?.(state);
-    if (state.phase !== 'shooting' && state.lastRound) this.startTally(state.lastRound);
+    if (state.phase !== 'shooting' && state.lastRound) {
+      if (state.highlight) {
+        const h = state.highlight;
+        setTimeout(() => {
+          if (this.state === state) this.startReplay(h);
+        }, 1300);
+      } else this.startTally(state.lastRound);
+    }
   }
 
   private startTally(result: RoundResult): void {
@@ -203,6 +279,27 @@ export class Table {
   /** Discs to draw right now, including fading/dropping effects. */
   frame(extra: Partial<Frame> = {}): Frame {
     const discs: DrawDisc[] = [];
+    if (this.replay) {
+      const r = this.replay;
+      for (const d of r.live.sim.discs) discs.push({ id: d.id, team: d.team, x: d.x, y: d.y });
+      const now = performance.now();
+      this.fx = this.fx.filter((f) => now < f.start + f.dur);
+      for (const f of this.fx) {
+        const t = Math.max(0, (now - f.start) / f.dur);
+        discs.push({ ...f.disc, alpha: 1 - t, scale: f.kind === 'hole' ? 1 - 0.6 * t : 1 });
+      }
+      const s = this.state;
+      const b = r.highlight.before;
+      return {
+        ...extra,
+        discs: r.intro > 0 ? discs.filter((d) => d.id !== r.live.shotId) : discs,
+        state: replayState(s, r.highlight),
+        activeSeat: r.intro > 0 ? r.highlight.seat : null,
+        aim: r.intro > 0 ? { shot: { ...r.highlight.shot, power: r.highlight.shot.power * Math.min(1, (1.1 - r.intro) / 0.8) }, team: s.teamOfSeat[r.highlight.seat], solid: true } : null,
+        stacks: s.seats.map((seat) => ({ seat, team: s.teamOfSeat[seat], count: b.discsLeft[seat] - (seat === r.highlight.seat ? 1 : 0) })),
+        replaying: true,
+      };
+    }
     if (this.live) {
       for (const d of this.live.sim.discs) discs.push({ id: d.id, team: d.team, x: d.x, y: d.y });
     } else {

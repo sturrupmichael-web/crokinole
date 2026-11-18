@@ -156,6 +156,8 @@ function startLocal(prefs: Prefs): void {
     sfx.setEnabled(!sfx.enabled);
     soundBtn.textContent = sfx.enabled ? '🔊' : '🔇';
   });
+  // Tap the board to skip a replay.
+  canvas.addEventListener('pointerdown', () => table?.skipReplay());
   const exitBtn = el('button', 'iconbtn', '✕');
   exitBtn.title = 'Quit to menu';
   exitBtn.addEventListener('click', () =>
@@ -187,8 +189,18 @@ function startLocal(prefs: Prefs): void {
     onShotEnd: (o) => {
       if (!o.foul && o.twenties.length) hud.shout(o.twenties.length > 1 ? `${o.twenties.length}× 20!` : '20!', '#ffe27a');
     },
-    onTally: (p) => renderTally(p.done),
-    onChange: () => hud.renderScores(table.state, names),
+    onTally: (p) => {
+      renderTally(p.done);
+      if (p.done) hud.renderScores(table.state, names);
+    },
+    onReplay: (h) => {
+      hud.showReplay(h, table.state, names, () => table.skipReplay());
+      if (h) {
+        hud.setBanner('', null);
+        sfx.chime();
+      }
+    },
+    onChange: () => hud.renderScores(table.state, names, table.scoresPending),
   });
   if (autoplay) table.speed = 6;
   (window as unknown as { __table: Table }).__table = table;
@@ -288,7 +300,7 @@ function startLocal(prefs: Prefs): void {
         lastTurnKey = key;
         onTurn();
       }
-    } else if (table.moving) {
+    } else if (table.moving || table.replay) {
       hud.setBanner('', null);
     }
     const labels = s.seats.map((seat) => ({ seat, text: names[seat], team: s.teamOfSeat[seat], dim: s.phase === 'shooting' && currentSeat(s) !== seat }));

@@ -102,7 +102,10 @@ menuBtn.addEventListener('click', () => openMenu());
 tr.append(soundBtn, menuBtn);
 hud.root.append(tr);
 document.addEventListener('pointerdown', () => sfx.unlock());
-document.addEventListener('keydown', () => sfx.unlock());
+document.addEventListener('keydown', (e) => {
+  sfx.unlock();
+  if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') table?.skipReplay();
+});
 
 const base = import.meta.env.BASE_URL;
 const joinUrl = `${location.origin}${base}join/?room=${room}`;
@@ -113,6 +116,8 @@ let table: Table | null = null;
 let previews = new Map<Seat, { shot: Shot; at: number }>();
 let cpuBusy = false;
 let tallyTimer: number | undefined;
+/** The game-over screen is up on the TV, so phones may show the winner too. */
+let resultShown = false;
 
 function names(): string[] {
   const n = ['', '', '', ''];
@@ -129,18 +134,24 @@ function makeTable(game: GameState): Table {
       rs.lastNews = o.foul ? 'Foul!' : o.twenties.length ? '20!' : o.short ? 'Short' : '';
       if (!o.foul && o.twenties.length) hud.shout(o.twenties.length > 1 ? `${o.twenties.length}× 20!` : '20!');
     },
+    onReplay: (h) => {
+      hud.showReplay(h, table!.state, names(), () => table?.skipReplay());
+      if (h) sfx.chime();
+      broadcast();
+    },
     onTally: (p) => {
       hud.showTally(p, table!.state, names(), p.done ? () => afterTally() : undefined, table!.state.phase === 'game-over' ? 'See result' : 'Next round');
       if (p.done) {
+        hud.renderScores(table!.state, names());
         clearTimeout(tallyTimer);
-        if (table!.state.phase === 'round-over') tallyTimer = window.setTimeout(afterTally, 9000);
+        tallyTimer = window.setTimeout(afterTally, table!.state.phase === 'round-over' ? 9000 : 6000);
       }
       broadcast();
     },
     onChange: (s) => {
       rs.game = s;
       rs.moving = table?.moving ?? false;
-      hud.renderScores(s, names());
+      hud.renderScores(s, names(), table?.scoresPending ?? false);
       broadcast();
     },
   });
@@ -151,6 +162,7 @@ function afterTally(): void {
   if (!table) return;
   hud.showTally(null, table.state, names());
   if (table.state.phase === 'game-over') {
+    resultShown = true;
     sfx.chime();
     hud.showModal(hud.gameOverHtml(table.state, names()), [
       ['Back to lobby', () => backToLobby()],
@@ -170,7 +182,8 @@ function broadcast(): void {
   if (table) {
     rs.game = table.state;
     rs.moving = table.moving;
-    rs.tallying = !!table.tally;
+    // The TV is busy with the end of a round (replay, tally) until the result has been revealed.
+    rs.tallying = !resultShown && !table.moving && table.scoresPending;
   }
   const now = performance.now();
   const send = () => {
@@ -385,6 +398,7 @@ function startGame(): void {
   rs.game = game;
   rs.lastNews = '';
   table = makeTable(game);
+  resultShown = false;
   previews = new Map();
   hud.renderScores(game, names());
   hud.showTally(null, game, names());
@@ -397,6 +411,7 @@ function backToLobby(): void {
   rs.phase = 'lobby';
   rs.game = null;
   rs.tallying = false;
+  resultShown = false;
   table = null;
   hud.showTally(null, createGame({ players: 2, target: 100 }), []);
   hud.setBanner('');

@@ -41,6 +41,8 @@ export interface Frame {
   /** Discs in hand per seat, drawn as little stacks by the rail. */
   stacks?: { seat: Seat; team: number; count: number }[];
   labels?: { seat: Seat; text: string; team: number; dim?: boolean }[];
+  /** Draw the slow-motion replay frame (vignette + REPLAY badge). */
+  replaying?: boolean;
   /** Board state used to place the aim ghost (launch slides along the arc around discs). */
   state?: GameState;
 }
@@ -144,6 +146,38 @@ export class BoardView {
     for (const d of frame.discs) this.drawDisc(d);
     if (frame.aim) this.drawAim(frame.aim.shot, frame.aim.team, frame.state, frame.aim.solid);
     this.drawFloaters();
+    if (frame.replaying) this.drawReplayFrame();
+  }
+
+  private drawReplayFrame(): void {
+    const g = this.g;
+    const w = this.canvas.width / this.dpr;
+    const h = this.canvas.height / this.dpr;
+    g.save();
+    const vig = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, w, h);
+    // Blinking REC-style badge.
+    const on = Math.floor(performance.now() / 600) % 2 === 0;
+    const size = Math.max(14, Math.min(26, h * 0.035));
+    g.font = `900 ${size}px system-ui, sans-serif`;
+    g.textBaseline = 'middle';
+    const label = 'REPLAY  ·  SLOW MOTION';
+    const tw = g.measureText(label).width;
+    const x = w / 2 - (tw + size * 1.6) / 2;
+    const y = Math.max(size * 1.4, this.cy - (17.2 * this.scale));
+    g.fillStyle = 'rgba(20,10,4,0.8)';
+    roundRect(g, x - size * 0.6, y - size * 0.9, tw + size * 2.8, size * 1.8, size * 0.9);
+    g.fill();
+    g.fillStyle = on ? '#ff4b3e' : 'rgba(255,75,62,0.35)';
+    g.beginPath();
+    g.arc(x + size * 0.35, y, size * 0.35, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#fbeed3';
+    g.fillText(label, x + size * 1.1, y + 1);
+    g.restore();
   }
 
   private drawArc(seat: Seat): void {

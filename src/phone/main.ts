@@ -8,7 +8,7 @@ import type { Seat } from '../engine/board';
 import { type Shot, currentSeat, requirement } from '../engine/rules';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { AimInput } from '../ui/aim';
-import { REQ_TEXT, el, esc, teamLabel, verb } from '../ui/hud';
+import { REQ_TEXT, awardsHtml, el, esc, shownScores, teamLabel, verb } from '../ui/hud';
 import { type PhoneMsg, type RoomState, cleanName, isRoomCode, normalizeRoomCode, pidKey, seatOfKey } from '../net/protocol';
 import { type Transport, createTransport, hasSupabase } from '../net/transport';
 
@@ -170,11 +170,12 @@ function play(room: string, myName: string): void {
     if (g) {
       const names = ['', '', '', ''];
       rs.seatPlayer.forEach((i, s) => i != null && (names[s] = rs!.players[i]?.name ?? ''));
-      top.innerHTML += `<span class="scores">${g.scores.map((s, t) => `<span><i class="dot" style="background:${TEAM_COLORS[t]}"></i>${s}</span>`).join('')}</span>`;
-      if (g.phase === 'game-over') {
+      top.innerHTML += `<span class="scores">${shownScores(g, rs.tallying).map((s, t) => `<span><i class="dot" style="background:${TEAM_COLORS[t]}"></i>${s}</span>`).join('')}</span>`;
+      if (g.phase === 'game-over' && !rs.tallying) {
         const w = g.winner ?? 0;
         const label = teamLabel(g, names, w);
-        overlay.innerHTML = `<div class="trophy">🏆</div><h2 style="color:${TEAM_COLORS[w]}">${esc(label)} ${verb(label, 'wins', 'win')}!</h2><p class="muted">Final: ${g.scores.join(' – ')}</p>`;
+        const mine = mySeat != null && g.teamOfSeat[mySeat] === w;
+        overlay.innerHTML = `<div class="trophy">${mine ? '🏆' : '🎉'}</div><h2 style="color:${TEAM_COLORS[w]}">${esc(label)} ${verb(label, 'wins', 'win')}!</h2><p class="muted">Final: ${g.scores.join(' – ')}</p>${awardsHtml(g, names)}`;
         overlay.classList.remove('hidden');
       } else overlay.classList.add('hidden');
     }
@@ -195,14 +196,14 @@ function play(room: string, myName: string): void {
       aim.enable(null);
       return;
     }
-    if (g.phase !== 'game-over') overlay.classList.add('hidden');
+    if (g.phase !== 'game-over' || rs.tallying) overlay.classList.add('hidden');
 
     const cur = currentSeat(g);
     if (rs.moving) {
       status.innerHTML = `<b>👀 Watch the screen!</b>`;
       aim.enable(null);
     } else if (rs.tallying || g.phase !== 'shooting') {
-      status.innerHTML = g.phase === 'game-over' ? '' : `<b>Round ${g.round} scoring</b><span class="muted">See the big screen</span>`;
+      status.innerHTML = g.phase === 'game-over' && !rs.tallying ? '' : `<b>${g.phase === 'game-over' ? 'Final round' : `Round ${g.round}`} scoring</b><span class="muted">👀 Watch the big screen</span>`;
       aim.enable(null);
     } else if (myTurn()) {
       status.innerHTML = `<b class="go">Your turn!</b><span class="req">${REQ_TEXT[requirement(g, mySeat)]}</span><span class="muted">${g.discsLeft[mySeat]} disc${g.discsLeft[mySeat] === 1 ? '' : 's'} left · drag along the line, pull back, let go</span>`;
