@@ -4,10 +4,12 @@
  *  phone → host  event "msg":    { pid, m: PhoneMsg }   (pid = random id kept per device per room)
  *  host  → all   event "state":  RoomState              (on every change, and in reply to hello)
  *  host  → all   event "aim":    { seat, shot }         (low-rate ghost, so other phones can watch too)
+ *  host  → all   event "shot":   { turn, shot }         (a shot just started; phones replay it live with the same physics)
  *  host  → all   event "closed": {}                     (host ended the room)
  *
- * Phones never run physics. They send a shot; the host simulates it, applies
- * the rules and broadcasts the new state.
+ * Phones send a shot; the host simulates it, applies the rules and broadcasts
+ * the new state. Phones only re-run the physics of a shot for display while it
+ * moves (it's deterministic, so it matches the TV); the host's state always wins.
  */
 import type { Seat } from '../engine/board';
 import type { GameState, Shot } from '../engine/rules';

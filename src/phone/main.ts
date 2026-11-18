@@ -1,11 +1,13 @@
 /**
  * Phone controller. Joins a room by code and name, shows your seat's view of
- * the board, and turns a drag-and-pull-back into a shot for the host. It never
- * runs physics: everything you see comes from the host's broadcasts.
+ * the board, and turns a drag-and-pull-back into a shot for the host. Game
+ * state always comes from the host; while a shot moves, the phone re-runs the
+ * same deterministic physics so the discs animate there too.
  */
 import '../styles.css';
 import type { Seat } from '../engine/board';
-import { type Shot, currentSeat, requirement } from '../engine/rules';
+import { type LiveShot, type Shot, beginShot, currentSeat, requirement } from '../engine/rules';
+import { PHYSICS } from '../engine/board';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { AimInput } from '../ui/aim';
 import { REQ_TEXT, awardsHtml, el, esc, shownScores, teamLabel, verb } from '../ui/hud';
@@ -224,8 +226,24 @@ function play(room: string, myName: string): void {
     if (errText) status.innerHTML += `<span class="warn">${esc(errText)}</span>`;
   }
 
+  // A shot in motion, re-simulated here from the host's shot (same deterministic physics).
+  let live: LiveShot | null = null;
+  let liveAcc = 0;
+  transport.on('shot', (m: { turn: number; shot: Shot }) => {
+    const g = rs?.game;
+    if (!g || !m?.shot || g.nextId !== m.turn) return;
+    try {
+      live = beginShot(g, m.shot);
+      liveAcc = 0;
+    } catch {
+      live = null;
+    }
+  });
+
   transport.on('state', (s: RoomState) => {
     if (!s || s.room !== room) return;
+    // The shot has been applied (or abandoned): show the host's board from here on.
+    if (live && (!s.moving || s.game?.nextId !== rs?.game?.nextId)) live = null;
     rs = s;
     lastState = Date.now();
     if (s.game && sentTurn !== -1 && s.game.nextId !== sentTurn) sentTurn = -1;
@@ -279,14 +297,22 @@ function play(room: string, myName: string): void {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     const g = rs?.game;
+    if (live) {
+      liveAcc += dt;
+      while (liveAcc >= PHYSICS.dt && live.sim.isMoving()) {
+        liveAcc -= PHYSICS.dt;
+        live.sim.step();
+      }
+    }
     if (g) {
+      const discs = live ? live.sim.discs : g.board;
       view.draw(
         {
-          discs: g.board.map((d) => ({ id: d.id, team: d.team, x: d.x, y: d.y })),
+          discs: discs.map((d) => ({ id: d.id, team: d.team, x: d.x, y: d.y })),
           state: g,
           activeSeat: g.phase === 'shooting' && !rs!.moving ? currentSeat(g) : null,
           aim: preview && myTurn() ? { shot: preview, team: g.teamOfSeat[mySeat!] } : null,
-          stacks: mySeat != null ? [{ seat: mySeat, team: g.teamOfSeat[mySeat], count: g.discsLeft[mySeat] }] : [],
+          stacks: mySeat != null ? [{ seat: mySeat, team: g.teamOfSeat[mySeat], count: g.discsLeft[mySeat] - (live?.shot.seat === mySeat ? 1 : 0) }] : [],
         },
         dt,
       );

@@ -276,11 +276,18 @@ transport.on('msg', (env: Envelope) => {
       if (m.turn !== table.state.nextId) return broadcast(); // stale or duplicate
       if (!table.canShoot(seat as Seat)) return broadcast();
       previews.delete(seat as Seat);
-      table.shoot({ seat: seat as Seat, ...sanitize(m.shot) });
+      shootAndTell({ seat: seat as Seat, ...sanitize(m.shot) });
       break;
     }
   }
 });
+
+/** Shoot on the table, and tell phones the shot so they can play the same (deterministic) physics live. */
+function shootAndTell(shot: Shot): void {
+  if (!table) return;
+  const turn = table.state.nextId;
+  if (table.shoot(shot)) transport.send('shot', { turn, shot });
+}
 
 function sanitize(s: { baselinePos: number; angle: number; power: number }): { baselinePos: number; angle: number; power: number } {
   const num = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : (lo + hi) / 2);
@@ -501,7 +508,7 @@ function loop(now: number): void {
               setTimeout(() => {
                 previews.delete(seat);
                 cpuBusy = false;
-                if (table && table.state === s) table.shoot(shot);
+                if (table && table.state === s) shootAndTell(shot);
               }, 200);
           };
           anim();
