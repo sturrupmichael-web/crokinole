@@ -6,6 +6,27 @@
 import { BOARD, type Seat, arcPoint, seatAngle } from '../engine/board';
 import { type Shot, launch, type GameState } from '../engine/rules';
 import { VIEW_R, renderBoardArt } from './art';
+import type { Scene3D, Disc3D } from './scene3d';
+
+/** 'top': the flat top-down board. 'eye': 3D, from the shooter's side of the table. */
+export type CameraMode = 'top' | 'eye';
+const CAMERA_KEY = 'crokinole.camera';
+
+export function loadCameraPref(): CameraMode {
+  try {
+    return localStorage.getItem(CAMERA_KEY) === 'eye' ? 'eye' : 'top';
+  } catch {
+    return 'top';
+  }
+}
+
+function saveCameraPref(m: CameraMode): void {
+  try {
+    localStorage.setItem(CAMERA_KEY, m);
+  } catch {
+    /* storage blocked */
+  }
+}
 
 export const TEAM_COLORS = ['#c8372d', '#23885a', '#2f5fb8'];
 export const TEAM_NAMES = ['Red', 'Green', 'Blue'];
@@ -65,10 +86,46 @@ export class BoardView {
   private dpr = 1;
   /** Fraction of the view radius to fit (lets the phone zoom in). */
   fit = { r: VIEW_R, offsetY: 0 };
+  /** Requested camera; the 3D view takes over once it has loaded. */
+  camera: CameraMode = 'top';
+  private s3: Scene3D | null = null;
+  private s3Loading: Promise<void> | null = null;
+  /** Called when the camera actually changes (e.g. to update a button). */
+  onCameraChange?: (m: CameraMode) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d')!;
+  }
+
+  /** True while the 3D player's-eye view is drawing. */
+  get eye(): boolean {
+    return this.camera === 'eye' && this.s3 != null;
+  }
+
+  /** Switch camera. Loads the 3D renderer the first time; falls back to top-down if WebGL fails. */
+  setCamera(m: CameraMode, save = true): void {
+    this.camera = m;
+    if (save) saveCameraPref(m);
+    if (m === 'eye' && !this.s3) {
+      this.s3Loading ??= import('./scene3d')
+        .then(({ Scene3D }) => {
+          this.s3 = new Scene3D(this.canvas);
+          this.resize();
+        })
+        .catch((err) => {
+          console.warn('3D view unavailable', err);
+          this.camera = 'top';
+          this.s3Loading = null;
+        })
+        .finally(() => {
+          this.s3?.setVisible(this.camera === 'eye');
+          this.onCameraChange?.(this.camera);
+        });
+      return;
+    }
+    this.s3?.setVisible(m === 'eye');
+    this.onCameraChange?.(m);
   }
 
   /** Switch between the classic and 5-hole board art. */
@@ -95,6 +152,9 @@ export class BoardView {
     this.canvas.height = Math.max(1, Math.round(rect.height * this.dpr));
     const w = rect.width;
     const h = rect.height;
+    if (this.s3) {
+      this.s3.resize(w, h, this.dpr);
+    }
     this.scale = Math.min(w, h) / (2 * this.fit.r);
     this.cx = w / 2;
     this.cy = h / 2 + this.fit.offsetY * this.scale;
@@ -107,6 +167,7 @@ export class BoardView {
   }
 
   toScreen(x: number, y: number): [number, number] {
+    if (this.eye) return this.s3!.project(x, y);
     const c = Math.cos(this.rot);
     const s = Math.sin(this.rot);
     const rx = x * c - y * s;
@@ -115,6 +176,7 @@ export class BoardView {
   }
 
   toWorld(px: number, py: number): { x: number; y: number } {
+    if (this.eye) return this.s3!.unproject(px, py);
     const rx = (px - this.cx) / this.scale;
     const ry = -(py - this.cy) / this.scale;
     const c = Math.cos(-this.rot);
@@ -135,6 +197,11 @@ export class BoardView {
     const g = this.g;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (this.eye) {
+      this.drawEye(frame);
+      return;
+    }
 
     // Static board.
     if (this.art) {
@@ -160,6 +227,34 @@ export class BoardView {
     if (frame.replaying) this.drawReplayFrame();
   }
 
+  /** 3D frame: the scene draws board and discs; this canvas only adds the overlays. */
+  private drawEye(frame: Frame): void {
+    const s3 = this.s3!;
+    const discs: Disc3D[] = [...frame.discs];
+    if (frame.stacks) {
+      for (const st of frame.stacks) {
+        for (let i = 0; i < st.count; i++) {
+          const p = this.seatAnchor(st.seat, 0.42 + i * 0.062, BOARD.railR + 0.95);
+          discs.push({ id: -2, team: st.team, x: p.x, y: p.y, scale: 0.72 });
+        }
+      }
+    }
+    let aimLine: (() => void) | null = null;
+    if (frame.aim) {
+      const { shot, team, solid } = frame.aim;
+      const l = this.launchOf(shot, frame.state);
+      discs.push({ id: -1, team, x: l.x, y: l.y, alpha: solid ? 1 : 0.92, glow: true, ghost: !solid });
+      aimLine = () => this.drawAimLine(shot, l);
+    }
+    // Pixels per inch at the centre, for overlay sizes.
+    this.scale = s3.centerScale;
+    s3.render(discs, this.rot, this.fiveHole, frame.activeSeat ?? null);
+    if (frame.labels) for (const l of frame.labels) this.drawLabel(l.seat, l.text, l.team, l.dim);
+    aimLine?.();
+    this.drawFloaters();
+    if (frame.replaying) this.drawReplayFrame();
+  }
+
   private drawReplayFrame(): void {
     const g = this.g;
     const w = this.canvas.width / this.dpr;
@@ -178,7 +273,7 @@ export class BoardView {
     const label = 'REPLAY  ·  SLOW MOTION';
     const tw = g.measureText(label).width;
     const x = w / 2 - (tw + size * 1.6) / 2;
-    const y = Math.max(size * 1.4, this.cy - (17.2 * this.scale));
+    const y = this.eye ? size * 1.6 : Math.max(size * 1.4, this.cy - 17.2 * this.scale);
     g.fillStyle = 'rgba(20,10,4,0.8)';
     roundRect(g, x - size * 0.6, y - size * 0.9, tw + size * 2.8, size * 1.8, size * 0.9);
     g.fill();
@@ -250,13 +345,21 @@ export class BoardView {
     g.restore();
   }
 
+  private launchOf(shot: Shot, state: GameState | undefined): { x: number; y: number; vx: number; vy: number } {
+    if (state) return launch(state, shot);
+    const p = arcPoint(shot.seat, shot.baselinePos);
+    const dir = seatAngle(shot.seat) + Math.PI - shot.angle;
+    return { x: p.x, y: p.y, vx: Math.cos(dir), vy: Math.sin(dir) };
+  }
+
   private drawAim(shot: Shot, team: number, state: GameState | undefined, solid = false): void {
+    const l = this.launchOf(shot, state);
+    this.drawAimLine(shot, l);
+    this.drawDisc({ id: -1, team, x: l.x, y: l.y, alpha: solid ? 1 : 0.6, glow: true });
+  }
+
+  private drawAimLine(shot: Shot, l: { x: number; y: number; vx: number; vy: number }): void {
     const g = this.g;
-    const l = state ? launch(state, shot) : (() => {
-      const p = arcPoint(shot.seat, shot.baselinePos);
-      const dir = seatAngle(shot.seat) + Math.PI - shot.angle;
-      return { x: p.x, y: p.y, vx: Math.cos(dir), vy: Math.sin(dir) };
-    })();
     const sp = Math.hypot(l.vx, l.vy) || 1;
     const ux = l.vx / sp;
     const uy = l.vy / sp;
@@ -279,7 +382,6 @@ export class BoardView {
       g.stroke();
       g.restore();
     }
-    this.drawDisc({ id: -1, team, x: l.x, y: l.y, alpha: solid ? 1 : 0.6, glow: true });
   }
 
   private seatAnchor(seat: Seat, along: number, out: number): { x: number; y: number } {
@@ -325,14 +427,15 @@ export class BoardView {
     for (const f of this.floaters) {
       const t = (now - f.born) / f.life;
       const [x, y] = this.toScreen(f.x, f.y);
+      const sc = this.eye ? Math.max(this.scale * 0.8, this.s3!.scaleAt(f.x, f.y)) : this.scale;
       g.save();
       g.globalAlpha = t < 0.15 ? t / 0.15 : 1 - Math.max(0, (t - 0.6) / 0.4);
-      g.font = `900 ${f.size * this.scale}px system-ui, sans-serif`;
+      g.font = `900 ${f.size * sc}px system-ui, sans-serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.lineWidth = Math.max(3, f.size * this.scale * 0.14);
+      g.lineWidth = Math.max(3, f.size * sc * 0.14);
       g.strokeStyle = 'rgba(20,10,4,0.85)';
-      const yy = y - t * 1.2 * this.scale;
+      const yy = y - t * 1.2 * sc;
       g.strokeText(f.text, x, yy);
       g.fillStyle = f.color;
       g.fillText(f.text, x, yy);

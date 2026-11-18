@@ -12,7 +12,7 @@ import { type GameState, type PlayerCount, type Shot, createGame, currentSeat, r
 import { Table } from '../game/table';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { Sfx } from '../ui/audio';
-import { Hud, REQ_TEXT, el, esc } from '../ui/hud';
+import { Hud, REQ_TEXT, cameraButton, el, esc } from '../ui/hud';
 import {
   type Envelope,
   MAX_PLAYERS,
@@ -102,7 +102,7 @@ soundBtn.addEventListener('click', () => {
 const menuBtn = el('button', 'iconbtn', '☰');
 menuBtn.title = 'Room menu';
 menuBtn.addEventListener('click', () => openMenu());
-tr.append(soundBtn, menuBtn);
+tr.append(cameraButton(view), soundBtn, menuBtn);
 hud.root.append(tr);
 document.addEventListener('pointerdown', () => sfx.unlock());
 document.addEventListener('keydown', (e) => {
@@ -500,6 +500,8 @@ function loop(now: number): void {
       const p = rs.players[rs.seatPlayer[seat] ?? -1];
       return { seat, text: p ? (p.connected ? p.name : `${p.name} (away)`) : '', team: s.teamOfSeat[seat], dim: s.phase === 'shooting' && currentSeat(s) !== seat };
     });
+    // The 3D view looks from the shooter's seat; top-down keeps seat 0 at the bottom.
+    if (!table.moving && s.phase === 'shooting') view.faceSeat(view.camera === 'eye' ? currentSeat(s) : 0);
     if (!table.moving && !table.tally && s.phase === 'shooting') {
       const seat = currentSeat(s);
       const p = rs.players[rs.seatPlayer[seat] ?? -1];

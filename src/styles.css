@@ -51,7 +51,9 @@ button { font: inherit; }
 .callout.pop { animation: pop 1.6s ease-out forwards; }
 @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 22% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
 .topright { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+.phone-stage .cam-btn { position: absolute; top: 10px; right: 10px; z-index: 3; height: 38px; }
 .iconbtn { appearance: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 20px; cursor: pointer; display: grid; place-items: center; }
+.cam-btn { width: auto; min-width: 44px; padding: 0 10px; font-size: 14px; font-weight: 800; letter-spacing: 0.02em; }
 
 .tally { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; width: min(300px, calc(100vw - 24px)); }
 .tally h2 { margin: 0 0 6px; font-size: 18px; }

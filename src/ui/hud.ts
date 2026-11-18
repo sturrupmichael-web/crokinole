@@ -3,7 +3,7 @@
  * banner, big callouts, the round-tally panel and a generic modal.
  */
 import type { GameState, Requirement } from '../engine/rules';
-import { TEAM_COLORS, TEAM_NAMES } from '../render/view';
+import { type BoardView, TEAM_COLORS, TEAM_NAMES, loadCameraPref } from '../render/view';
 import type { TallyProgress } from '../game/table';
 import { type Highlight, gameAwards } from '../engine/highlights';
 
@@ -61,6 +61,24 @@ export function verb(label: string, singular: string, plural: string): string {
 export function shownScores(state: GameState, pending: boolean): number[] {
   if (!pending || state.phase === 'shooting' || !state.lastRound) return state.scores;
   return state.scores.map((s, t) => s - (state.lastRound!.tallies[t]?.awarded ?? 0));
+}
+
+/**
+ * Camera toggle (top-down ⇄ 3D player's eye). Applies the saved choice to
+ * `view` and keeps the label on the view you'd switch to.
+ */
+export function cameraButton(view: BoardView, cls = 'iconbtn cam-btn'): HTMLButtonElement {
+  const b = el('button', cls);
+  const label = (m: string) => {
+    b.textContent = m === 'eye' ? 'Top' : '3D';
+    b.title = m === 'eye' ? 'Switch to the top-down view' : "Switch to the 3D player's-eye view";
+  };
+  view.onCameraChange = label;
+  b.addEventListener('click', () => view.setCamera(view.camera === 'eye' ? 'top' : 'eye'));
+  const start = loadCameraPref();
+  label(start);
+  if (start === 'eye') view.setCamera('eye', false);
+  return b;
 }
 
 export class Hud {

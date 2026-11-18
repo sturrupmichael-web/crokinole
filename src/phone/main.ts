@@ -10,7 +10,7 @@ import { type LiveShot, type Shot, beginShot, currentSeat, requirement } from '.
 import { PHYSICS } from '../engine/board';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { AimInput } from '../ui/aim';
-import { REQ_TEXT, awardsHtml, el, esc, shownScores, teamLabel, verb } from '../ui/hud';
+import { REQ_TEXT, awardsHtml, cameraButton, el, esc, shownScores, teamLabel, verb } from '../ui/hud';
 import { type PhoneMsg, type RoomState, cleanName, isRoomCode, normalizeRoomCode, pidKey, seatOfKey } from '../net/protocol';
 import { type Transport, createTransport, hasSupabase } from '../net/transport';
 import { trackPresence } from '../net/presence';
@@ -113,6 +113,7 @@ function play(room: string, myName: string): void {
   app.append(root);
 
   const view = new BoardView(canvas);
+  stageBox.append(cameraButton(view));
   let rs: RoomState | null = null;
   let mySeat: Seat | null = null;
   let preview: Shot | null = null;

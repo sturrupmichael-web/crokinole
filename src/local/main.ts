@@ -11,7 +11,7 @@ import { Table } from '../game/table';
 import { BoardView, TEAM_COLORS } from '../render/view';
 import { AimInput } from '../ui/aim';
 import { Sfx } from '../ui/audio';
-import { Hud, REQ_TEXT, el, esc } from '../ui/hud';
+import { Hud, REQ_TEXT, cameraButton, el, esc } from '../ui/hud';
 import { normalizeRoomCode } from '../net/protocol';
 import { onPlayerCount, trackPresence } from '../net/presence';
 
@@ -182,7 +182,7 @@ function startLocal(prefs: Prefs): void {
       ['Quit', () => stop(), true],
     ]),
   );
-  tr.append(soundBtn, exitBtn);
+  tr.append(cameraButton(view), soundBtn, exitBtn);
   hud.root.append(tr);
 
   const game = createGame({ players: prefs.players, target: prefs.target, board: prefs.board });

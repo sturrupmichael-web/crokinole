@@ -80,6 +80,20 @@ rounds, the tally and the end screen.
 Stats live in `GameState.stats` (per seat) and `GameState.highlight` (this round's best shot), so
 they survive a host refresh. See `src/engine/highlights.ts`.
 
+## Camera views
+
+The **3D / Top** button (top right on the computer and TV, on the board on phones) switches between:
+
+- **Top-down**: the flat board, as before.
+- **3D player's eye**: a three.js scene looking across the board from your seat, with real pegs,
+  disc thickness, the ditch, the rail and soft shadows. Phones and local play look from your own seat;
+  the TV turns to whoever is shooting. Aiming works the same way: the press and pull are traced onto
+  the board plane, so the slingshot behaves exactly as in top-down.
+
+The choice is remembered per device. The 3D renderer (`src/render/scene3d.ts`) is loaded only when
+someone picks it; the physics and rules don't know it exists. If WebGL isn't available it falls back to
+top-down.
+
 ## 5-hole board
 
 An optional board (pick "5-hole (−10s)" in the local menu or the party lobby) adds four
