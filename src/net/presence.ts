@@ -78,11 +78,19 @@ export function trackPresence(role: Role): void {
 /** +1 on the site visit counter, once per browser tab session. */
 function recordVisit(): void {
   try {
+    // "Don't count my visits" switch on michaelsturrup.com/stats/.
+    if (localStorage.getItem('michaelsturrup.nocount') === '1') return;
     const k = `michaelsturrup.visit.${GAME_SLUG}`;
     if (sessionStorage.getItem(k)) return;
     sessionStorage.setItem(k, '1');
   } catch {
     /* storage blocked: still count */
   }
-  void supabaseClient()?.rpc('record_visit', { p_page: GAME_SLUG });
+  // supabase-js builders are lazy: the request only goes out once it's awaited/then'd.
+  supabaseClient()
+    ?.rpc('record_visit', { p_page: GAME_SLUG })
+    .then(
+      () => {},
+      () => {},
+    );
 }
