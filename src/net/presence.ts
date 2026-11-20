@@ -78,8 +78,6 @@ export function trackPresence(role: Role): void {
 /** +1 on the site visit counter, once per browser tab session. */
 function recordVisit(): void {
   try {
-    // "Don't count my visits" switch on michaelsturrup.com/stats/.
-    if (localStorage.getItem('michaelsturrup.nocount') === '1') return;
     const k = `michaelsturrup.visit.${GAME_SLUG}`;
     if (sessionStorage.getItem(k)) return;
     sessionStorage.setItem(k, '1');
