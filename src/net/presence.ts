@@ -84,5 +84,11 @@ function recordVisit(): void {
   } catch {
     /* storage blocked: still count */
   }
-  void supabaseClient()?.rpc('record_visit', { p_page: GAME_SLUG });
+  // supabase-js builders are lazy: the request only goes out once it's awaited/then'd.
+  supabaseClient()
+    ?.rpc('record_visit', { p_page: GAME_SLUG })
+    .then(
+      () => {},
+      () => {},
+    );
 }
